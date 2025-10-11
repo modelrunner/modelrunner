@@ -1,7 +1,7 @@
 MAKEFILE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
 
-MODELRUNNERCLIENTDIR = $(MAKEFILE_DIR)/projects/modelrunner_client
+MODELRUNNERCLIENTDIR = $(MAKEFILE_DIR)/projects/modelrunner_ai
 
 .PHONY: docs
 

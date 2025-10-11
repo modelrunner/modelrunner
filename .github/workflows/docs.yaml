@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e 'projects/modelrunner_client[docs]'
+          pip install -e 'projects/modelrunner_ai[docs]'
 
       - name: Build documentation
         run: make docs

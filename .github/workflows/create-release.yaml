@@ -8,7 +8,7 @@ on:
         required: true
         type: choice
         options:
-          - modelrunner_client
+          - modelrunner_ai
       bump_version:
         description: Version
         required: false
