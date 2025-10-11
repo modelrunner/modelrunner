@@ -1,7 +1,7 @@
-modelrunner_client
-==================
+modelrunner_ai
+==============
 
 .. toctree::
    :maxdepth: 4
 
-   modelrunner_client
+   modelrunner_ai
