@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>modelrunner_client &#8212; modelrunner_client  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="modelrunner_client package" href="modelrunner_client.html" />
+    <link rel="prev" title="modelrunner_client documentation" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="modelrunner-client">
+<h1>modelrunner_client<a class="headerlink" href="#modelrunner-client" title="Link to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modelrunner_client.html">modelrunner_client package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modelrunner_client.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modelrunner_client.html#module-modelrunner_client.auth">modelrunner_client.auth module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.auth.GoogleColabState"><code class="docutils literal notranslate"><span class="pre">GoogleColabState</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.auth.MissingCredentialsError"><code class="docutils literal notranslate"><span class="pre">MissingCredentialsError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.auth.fetch_credentials"><code class="docutils literal notranslate"><span class="pre">fetch_credentials()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.auth.get_colab_token"><code class="docutils literal notranslate"><span class="pre">get_colab_token()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.auth.is_google_colab"><code class="docutils literal notranslate"><span class="pre">is_google_colab()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modelrunner_client.html#module-modelrunner_client.client">modelrunner_client.client module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AppId"><code class="docutils literal notranslate"><span class="pre">AppId</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AppId.alias"><code class="docutils literal notranslate"><span class="pre">AppId.alias</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AppId.from_endpoint_id"><code class="docutils literal notranslate"><span class="pre">AppId.from_endpoint_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AppId.namespace"><code class="docutils literal notranslate"><span class="pre">AppId.namespace</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AppId.owner"><code class="docutils literal notranslate"><span class="pre">AppId.owner</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AppId.path"><code class="docutils literal notranslate"><span class="pre">AppId.path</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncCDNTokenManager"><code class="docutils literal notranslate"><span class="pre">AsyncCDNTokenManager</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncCDNTokenManager.get_token"><code class="docutils literal notranslate"><span class="pre">AsyncCDNTokenManager.get_token()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient"><code class="docutils literal notranslate"><span class="pre">AsyncClient</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.cancel"><code class="docutils literal notranslate"><span class="pre">AsyncClient.cancel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.default_timeout"><code class="docutils literal notranslate"><span class="pre">AsyncClient.default_timeout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.get_handle"><code class="docutils literal notranslate"><span class="pre">AsyncClient.get_handle()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.key"><code class="docutils literal notranslate"><span class="pre">AsyncClient.key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.result"><code class="docutils literal notranslate"><span class="pre">AsyncClient.result()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.run"><code class="docutils literal notranslate"><span class="pre">AsyncClient.run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.status"><code class="docutils literal notranslate"><span class="pre">AsyncClient.status()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.stream"><code class="docutils literal notranslate"><span class="pre">AsyncClient.stream()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.submit"><code class="docutils literal notranslate"><span class="pre">AsyncClient.submit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.subscribe"><code class="docutils literal notranslate"><span class="pre">AsyncClient.subscribe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.upload"><code class="docutils literal notranslate"><span class="pre">AsyncClient.upload()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.upload_file"><code class="docutils literal notranslate"><span class="pre">AsyncClient.upload_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncClient.upload_image"><code class="docutils literal notranslate"><span class="pre">AsyncClient.upload_image()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncMultipartUpload"><code class="docutils literal notranslate"><span class="pre">AsyncMultipartUpload</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncMultipartUpload.access_url"><code class="docutils literal notranslate"><span class="pre">AsyncMultipartUpload.access_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncMultipartUpload.auth_headers"><code class="docutils literal notranslate"><span class="pre">AsyncMultipartUpload.auth_headers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncMultipartUpload.complete"><code class="docutils literal notranslate"><span class="pre">AsyncMultipartUpload.complete()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncMultipartUpload.create"><code class="docutils literal notranslate"><span class="pre">AsyncMultipartUpload.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncMultipartUpload.save"><code class="docutils literal notranslate"><span class="pre">AsyncMultipartUpload.save()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncMultipartUpload.save_file"><code class="docutils literal notranslate"><span class="pre">AsyncMultipartUpload.save_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncMultipartUpload.upload_id"><code class="docutils literal notranslate"><span class="pre">AsyncMultipartUpload.upload_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncMultipartUpload.upload_part"><code class="docutils literal notranslate"><span class="pre">AsyncMultipartUpload.upload_part()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncRequestHandle"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncRequestHandle.cancel"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.cancel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncRequestHandle.client"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.client</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncRequestHandle.from_request_id"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.from_request_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncRequestHandle.get"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.get()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncRequestHandle.iter_events"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.iter_events()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.AsyncRequestHandle.status"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.status()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.CDNToken"><code class="docutils literal notranslate"><span class="pre">CDNToken</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.CDNToken.base_upload_url"><code class="docutils literal notranslate"><span class="pre">CDNToken.base_upload_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.CDNToken.expires_at"><code class="docutils literal notranslate"><span class="pre">CDNToken.expires_at</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.CDNToken.is_expired"><code class="docutils literal notranslate"><span class="pre">CDNToken.is_expired()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.CDNToken.token"><code class="docutils literal notranslate"><span class="pre">CDNToken.token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.CDNToken.token_type"><code class="docutils literal notranslate"><span class="pre">CDNToken.token_type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.CDNTokenManager"><code class="docutils literal notranslate"><span class="pre">CDNTokenManager</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.CDNTokenManager.get_token"><code class="docutils literal notranslate"><span class="pre">CDNTokenManager.get_token()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.Completed"><code class="docutils literal notranslate"><span class="pre">Completed</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.Completed.logs"><code class="docutils literal notranslate"><span class="pre">Completed.logs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.Completed.metrics"><code class="docutils literal notranslate"><span class="pre">Completed.metrics</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.InProgress"><code class="docutils literal notranslate"><span class="pre">InProgress</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.InProgress.logs"><code class="docutils literal notranslate"><span class="pre">InProgress.logs</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.ModelrunnerClientError"><code class="docutils literal notranslate"><span class="pre">ModelrunnerClientError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.ModelrunnerClientHTTPError"><code class="docutils literal notranslate"><span class="pre">ModelrunnerClientHTTPError</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.ModelrunnerClientHTTPError.message"><code class="docutils literal notranslate"><span class="pre">ModelrunnerClientHTTPError.message</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.ModelrunnerClientHTTPError.response_headers"><code class="docutils literal notranslate"><span class="pre">ModelrunnerClientHTTPError.response_headers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.ModelrunnerClientHTTPError.status_code"><code class="docutils literal notranslate"><span class="pre">ModelrunnerClientHTTPError.status_code</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.MultipartUpload"><code class="docutils literal notranslate"><span class="pre">MultipartUpload</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.MultipartUpload.access_url"><code class="docutils literal notranslate"><span class="pre">MultipartUpload.access_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.MultipartUpload.auth_headers"><code class="docutils literal notranslate"><span class="pre">MultipartUpload.auth_headers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.MultipartUpload.complete"><code class="docutils literal notranslate"><span class="pre">MultipartUpload.complete()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.MultipartUpload.create"><code class="docutils literal notranslate"><span class="pre">MultipartUpload.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.MultipartUpload.save"><code class="docutils literal notranslate"><span class="pre">MultipartUpload.save()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.MultipartUpload.save_file"><code class="docutils literal notranslate"><span class="pre">MultipartUpload.save_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.MultipartUpload.upload_id"><code class="docutils literal notranslate"><span class="pre">MultipartUpload.upload_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.MultipartUpload.upload_part"><code class="docutils literal notranslate"><span class="pre">MultipartUpload.upload_part()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.Queued"><code class="docutils literal notranslate"><span class="pre">Queued</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.Queued.position"><code class="docutils literal notranslate"><span class="pre">Queued.position</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.Status"><code class="docutils literal notranslate"><span class="pre">Status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient"><code class="docutils literal notranslate"><span class="pre">SyncClient</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.cancel"><code class="docutils literal notranslate"><span class="pre">SyncClient.cancel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.default_timeout"><code class="docutils literal notranslate"><span class="pre">SyncClient.default_timeout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.get_handle"><code class="docutils literal notranslate"><span class="pre">SyncClient.get_handle()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.key"><code class="docutils literal notranslate"><span class="pre">SyncClient.key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.result"><code class="docutils literal notranslate"><span class="pre">SyncClient.result()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.run"><code class="docutils literal notranslate"><span class="pre">SyncClient.run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.status"><code class="docutils literal notranslate"><span class="pre">SyncClient.status()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.stream"><code class="docutils literal notranslate"><span class="pre">SyncClient.stream()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.submit"><code class="docutils literal notranslate"><span class="pre">SyncClient.submit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.subscribe"><code class="docutils literal notranslate"><span class="pre">SyncClient.subscribe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.upload"><code class="docutils literal notranslate"><span class="pre">SyncClient.upload()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.upload_file"><code class="docutils literal notranslate"><span class="pre">SyncClient.upload_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncClient.upload_image"><code class="docutils literal notranslate"><span class="pre">SyncClient.upload_image()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncRequestHandle"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncRequestHandle.cancel"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.cancel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncRequestHandle.client"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.client</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncRequestHandle.from_request_id"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.from_request_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncRequestHandle.get"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.get()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncRequestHandle.iter_events"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.iter_events()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.SyncRequestHandle.status"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.status()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.encode"><code class="docutils literal notranslate"><span class="pre">encode()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.encode_file"><code class="docutils literal notranslate"><span class="pre">encode_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.client.encode_image"><code class="docutils literal notranslate"><span class="pre">encode_image()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modelrunner_client.html#module-modelrunner_client">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient"><code class="docutils literal notranslate"><span class="pre">AsyncClient</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.cancel"><code class="docutils literal notranslate"><span class="pre">AsyncClient.cancel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.default_timeout"><code class="docutils literal notranslate"><span class="pre">AsyncClient.default_timeout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.get_handle"><code class="docutils literal notranslate"><span class="pre">AsyncClient.get_handle()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.key"><code class="docutils literal notranslate"><span class="pre">AsyncClient.key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.result"><code class="docutils literal notranslate"><span class="pre">AsyncClient.result()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.run"><code class="docutils literal notranslate"><span class="pre">AsyncClient.run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.status"><code class="docutils literal notranslate"><span class="pre">AsyncClient.status()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.stream"><code class="docutils literal notranslate"><span class="pre">AsyncClient.stream()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.submit"><code class="docutils literal notranslate"><span class="pre">AsyncClient.submit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.subscribe"><code class="docutils literal notranslate"><span class="pre">AsyncClient.subscribe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.upload"><code class="docutils literal notranslate"><span class="pre">AsyncClient.upload()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.upload_file"><code class="docutils literal notranslate"><span class="pre">AsyncClient.upload_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncClient.upload_image"><code class="docutils literal notranslate"><span class="pre">AsyncClient.upload_image()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.cancel"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.cancel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.cancel_url"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.cancel_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.client"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.client</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.from_request_id"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.from_request_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.get"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.get()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.iter_events"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.iter_events()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.request_id"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.request_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.response_url"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.response_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.status"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.status()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.AsyncRequestHandle.status_url"><code class="docutils literal notranslate"><span class="pre">AsyncRequestHandle.status_url</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.Completed"><code class="docutils literal notranslate"><span class="pre">Completed</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.Completed.logs"><code class="docutils literal notranslate"><span class="pre">Completed.logs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.Completed.metrics"><code class="docutils literal notranslate"><span class="pre">Completed.metrics</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.InProgress"><code class="docutils literal notranslate"><span class="pre">InProgress</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.InProgress.logs"><code class="docutils literal notranslate"><span class="pre">InProgress.logs</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.Queued"><code class="docutils literal notranslate"><span class="pre">Queued</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.Queued.position"><code class="docutils literal notranslate"><span class="pre">Queued.position</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.Status"><code class="docutils literal notranslate"><span class="pre">Status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient"><code class="docutils literal notranslate"><span class="pre">SyncClient</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.cancel"><code class="docutils literal notranslate"><span class="pre">SyncClient.cancel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.default_timeout"><code class="docutils literal notranslate"><span class="pre">SyncClient.default_timeout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.get_handle"><code class="docutils literal notranslate"><span class="pre">SyncClient.get_handle()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.key"><code class="docutils literal notranslate"><span class="pre">SyncClient.key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.result"><code class="docutils literal notranslate"><span class="pre">SyncClient.result()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.run"><code class="docutils literal notranslate"><span class="pre">SyncClient.run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.status"><code class="docutils literal notranslate"><span class="pre">SyncClient.status()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.stream"><code class="docutils literal notranslate"><span class="pre">SyncClient.stream()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.submit"><code class="docutils literal notranslate"><span class="pre">SyncClient.submit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.subscribe"><code class="docutils literal notranslate"><span class="pre">SyncClient.subscribe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.upload"><code class="docutils literal notranslate"><span class="pre">SyncClient.upload()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.upload_file"><code class="docutils literal notranslate"><span class="pre">SyncClient.upload_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncClient.upload_image"><code class="docutils literal notranslate"><span class="pre">SyncClient.upload_image()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.cancel"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.cancel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.cancel_url"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.cancel_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.client"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.client</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.from_request_id"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.from_request_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.get"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.get()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.iter_events"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.iter_events()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.request_id"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.request_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.response_url"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.response_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.status"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.status()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.SyncRequestHandle.status_url"><code class="docutils literal notranslate"><span class="pre">SyncRequestHandle.status_url</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.cancel"><code class="docutils literal notranslate"><span class="pre">cancel()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.cancel_async"><code class="docutils literal notranslate"><span class="pre">cancel_async()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.encode"><code class="docutils literal notranslate"><span class="pre">encode()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.encode_file"><code class="docutils literal notranslate"><span class="pre">encode_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.encode_image"><code class="docutils literal notranslate"><span class="pre">encode_image()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.result"><code class="docutils literal notranslate"><span class="pre">result()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.result_async"><code class="docutils literal notranslate"><span class="pre">result_async()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.run"><code class="docutils literal notranslate"><span class="pre">run()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.run_async"><code class="docutils literal notranslate"><span class="pre">run_async()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.status"><code class="docutils literal notranslate"><span class="pre">status()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.status_async"><code class="docutils literal notranslate"><span class="pre">status_async()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.stream"><code class="docutils literal notranslate"><span class="pre">stream()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.stream_async"><code class="docutils literal notranslate"><span class="pre">stream_async()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.submit"><code class="docutils literal notranslate"><span class="pre">submit()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.submit_async"><code class="docutils literal notranslate"><span class="pre">submit_async()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.subscribe"><code class="docutils literal notranslate"><span class="pre">subscribe()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modelrunner_client.html#modelrunner_client.subscribe_async"><code class="docutils literal notranslate"><span class="pre">subscribe_async()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">modelrunner_client</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">modelrunner_client</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modelrunner_client.html">modelrunner_client package</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">modelrunner_client documentation</a></li>
+      <li>Next: <a href="modelrunner_client.html" title="next chapter">modelrunner_client package</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, ModelRunner.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/modules.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
