@@ -8,7 +8,7 @@ git_describe_command= 'git describe --tags --abbrev=0 --dirty --match "modelrunn
 tag_regex = "^modelrunner_client_v(?P<version>.*)$"
 
 [project]
-name = "modelrunner_client"
+name = "modelrunner-ai"
 dynamic = ["version"]
 description = "Python client for modelrunner.ai"
 readme = "README.md"
