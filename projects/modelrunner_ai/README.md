@@ -7,7 +7,7 @@ This is a Python client library for interacting with ML models deployed on [mode
 To install the client, run:
 
 ```bash
-pip install modelrunner-client
+pip install modelrunner-ai
 ```
 
 To use the client, you need to have an API key. You can get one by signing up at [modelrunner.ai](https://modelrunner.ai). Once you have it, set

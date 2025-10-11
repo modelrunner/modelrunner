@@ -34,7 +34,7 @@ QUEUE_URL_FORMAT = f"https://queue.{MODELRUNNER_RUN_HOST}/"
 REALTIME_URL_FORMAT = f"wss://{MODELRUNNER_RUN_HOST}/"
 REST_URL = "https://modelrunner.run"
 CDN_URL = "https://media.modelrunner.ai"
-USER_AGENT = "modelrunner-client/0.2.2 (python)"
+USER_AGENT = "modelrunner-ai/0.2.2 (python)"
 
 
 @dataclass
