@@ -5,17 +5,14 @@ import math
 import os
 import mimetypes
 import asyncio
-from pathlib import Path
 import random
 import time
 import base64
-import threading
 import logging
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any, AsyncIterator, Dict, Iterator, TYPE_CHECKING, Optional, Literal
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 from httpx_sse import aconnect_sse, connect_sse
@@ -31,463 +28,25 @@ Priority = Literal["normal", "low"]
 
 RUN_URL_FORMAT = f"https://{MODELRUNNER_RUN_HOST}/"
 QUEUE_URL_FORMAT = f"https://queue.{MODELRUNNER_RUN_HOST}/"
-REALTIME_URL_FORMAT = f"wss://{MODELRUNNER_RUN_HOST}/"
 REST_URL = "https://modelrunner.run"
-CDN_URL = "https://media.modelrunner.ai"
 USER_AGENT = "modelrunner-ai/0.2.2 (python)"
 
 
-@dataclass
-class CDNToken:
-    token: str
-    token_type: str
-    base_upload_url: str
-    expires_at: datetime
-
-    def is_expired(self) -> bool:
-        return datetime.now(timezone.utc) >= self.expires_at
-
-
-class CDNTokenManager:
-    def __init__(self, key: str) -> None:
-        self._key = key
-        self._token: CDNToken = CDNToken(
-            token="",
-            token_type="",
-            base_upload_url="",
-            expires_at=datetime.min.replace(tzinfo=timezone.utc),
-        )
-        self._lock: threading.Lock = threading.Lock()
-        self._url = f"{REST_URL}/storage/auth/token?storage_type=modelrunner-cdn-v3"
-        self._headers = {
-            "Authorization": f"Key {self._key}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        }
-
-    def _refresh_token(self) -> CDNToken:
-        with httpx.Client() as client:
-            response = client.post(self._url, headers=self._headers, data=b"{}")
-            response.raise_for_status()
-            data = response.json()
-
-        return CDNToken(
-            token=data["token"],
-            token_type=data["token_type"],
-            base_upload_url=data["base_url"],
-            expires_at=datetime.fromisoformat(data["expires_at"]),
-        )
-
-    def get_token(self) -> CDNToken:
-        with self._lock:
-            if self._token.is_expired():
-                self._token = self._refresh_token()
-            return self._token
-
-
-class AsyncCDNTokenManager:
-    def __init__(self, key: str) -> None:
-        self._key = key
-        self._token: CDNToken = CDNToken(
-            token="",
-            token_type="",
-            base_upload_url="",
-            expires_at=datetime.min.replace(tzinfo=timezone.utc),
-        )
-        self._lock: asyncio.Lock = asyncio.Lock()
-        self._url = f"{REST_URL}/storage/auth/token?storage_type=modelrunner-cdn-v3"
-        self._headers = {
-            "Authorization": f"Key {self._key}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        }
-
-    async def _refresh_token(self) -> None:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(self._url, headers=self._headers, data=b"{}")
-            response.raise_for_status()
-            data = response.json()
-
-        return CDNToken(
-            token=data["token"],
-            token_type=data["token_type"],
-            base_upload_url=data["base_url"],
-            expires_at=datetime.fromisoformat(data["expires_at"]),
-        )
-
-    async def get_token(self) -> CDNToken:
-        async with self._lock:
-            if self._token.is_expired():
-                self._token = await self._refresh_token()
-            return self._token
-
-
-MULTIPART_THRESHOLD = 100 * 1024 * 1024
+MULTIPART_THRESHOLD = 90 * 1024 * 1024
 MULTIPART_CHUNK_SIZE = 10 * 1024 * 1024
 MULTIPART_MAX_CONCURRENCY = 10
 
 
-class MultipartUpload:
-    def __init__(
-        self,
-        *,
-        file_name: str,
-        client: httpx.Client,
-        token_manager: CDNTokenManager,
-        chunk_size: int | None = None,
-        content_type: str | None = None,
-        max_concurrency: int | None = None,
-    ) -> None:
-        self.file_name = file_name
-        self._client = client
-        self._token_manager = token_manager
-        self.chunk_size = chunk_size or MULTIPART_CHUNK_SIZE
-        self.content_type = content_type or "application/octet-stream"
-        self.max_concurrency = max_concurrency or MULTIPART_MAX_CONCURRENCY
-        self._access_url: str | None = None
-        self._upload_id: str | None = None
-        self._parts: list[dict] = []
-
-    @property
-    def access_url(self) -> str:
-        if not self._access_url:
-            raise ValueError("Upload not initiated")
-        return self._access_url
-
-    @property
-    def upload_id(self) -> str:
-        if not self._upload_id:
-            raise ValueError("Upload not initiated")
-        return self._upload_id
-
-    @property
-    def auth_headers(self) -> dict[str, str]:
-        token = self._token_manager.get_token()
-        return {
-            "Authorization": f"{token.token_type} {token.token}",
-            "User-Agent": "modelrunner/0.1.0",
-        }
-
-    def create(self):
-        token = self._token_manager.get_token()
-        url = f"{token.base_upload_url}/files/upload/multipart"
-        response = _maybe_retry_request(
-            self._client,
-            "POST",
-            url,
-            headers={
-                **self.auth_headers,
-                "Accept": "application/json",
-                "Content-Type": self.content_type,
-                "X-Modelrunner-File-Name": self.file_name,
-            },
-        )
-        result = response.json()
-        self._access_url = result["access_url"]
-        self._upload_id = result["uploadId"]
-
-    def upload_part(self, part_number: int, data: bytes) -> None:
-        url = f"{self.access_url}/multipart/{self.upload_id}/{part_number}"
-
-        response = _request(
-            self._client,
-            "PUT",
-            url,
-            headers={
-                **self.auth_headers,
-                "Content-Type": self.content_type,
-                "Accept-Encoding": "identity",  # Keep this to ensure we get ETag headers
-            },
-            content=data,
-            timeout=None,
-        )
-
-        etag = response.headers["etag"]
-        self._parts.append(
-            {
-                "partNumber": part_number,
-                "etag": etag,
-            }
-        )
-
-    def complete(self) -> str:
-        url = f"{self.access_url}/multipart/{self.upload_id}/complete"
-        _maybe_retry_request(
-            self._client,
-            "POST",
-            url,
-            headers=self.auth_headers,
-            json={"parts": self._parts},
-        )
-        return self.access_url
-
-    @classmethod
-    def save(
-        cls,
-        *,
-        client: httpx.Client,
-        token_manager: CDNTokenManager,
-        file_name: str,
-        data: bytes,
-        content_type: str | None = None,
-        chunk_size: int | None = None,
-        max_concurrency: int | None = None,
-    ):
-        import concurrent.futures
-
-        multipart = cls(
-            file_name=file_name,
-            client=client,
-            token_manager=token_manager,
-            chunk_size=chunk_size,
-            content_type=content_type,
-            max_concurrency=max_concurrency,
-        )
-        multipart.create()
-        parts = math.ceil(len(data) / multipart.chunk_size)
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=multipart.max_concurrency
-        ) as executor:
-            futures = []
-            for part_number in range(1, parts + 1):
-                start = (part_number - 1) * multipart.chunk_size
-                data = data[start : start + multipart.chunk_size]
-                futures.append(
-                    executor.submit(multipart.upload_part, part_number, data)
-                )
-            for future in concurrent.futures.as_completed(futures):
-                future.result()
-        return multipart.complete()
-
-    @classmethod
-    def save_file(
-        cls,
-        *,
-        client: httpx.Client,
-        token_manager: CDNTokenManager,
-        file_path: str | Path,
-        chunk_size: int | None = None,
-        content_type: str | None = None,
-        max_concurrency: int | None = None,
-    ) -> str:
-        import concurrent.futures
-
-        file_name = os.path.basename(file_path)
-        size = os.path.getsize(file_path)
-        multipart = cls(
-            file_name=file_name,
-            client=client,
-            token_manager=token_manager,
-            chunk_size=chunk_size,
-            content_type=content_type,
-            max_concurrency=max_concurrency,
-        )
-        multipart.create()
-        parts = math.ceil(size / multipart.chunk_size)
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=multipart.max_concurrency
-        ) as executor:
-            futures = []
-            for part_number in range(1, parts + 1):
-
-                def _upload_part(pn: int) -> None:
-                    with open(file_path, "rb") as f:
-                        start = (pn - 1) * multipart.chunk_size
-                        f.seek(start)
-                        data = f.read(multipart.chunk_size)
-                        multipart.upload_part(pn, data)
-
-                futures.append(executor.submit(_upload_part, part_number))
-            for future in concurrent.futures.as_completed(futures):
-                future.result()
-        return multipart.complete()
+def _extension_from_content_type(content_type: str) -> str:
+    try:
+        _, file_type = content_type.split("/", 1)
+        return file_type.split("-")[0].split(";")[0] or "bin"
+    except Exception:
+        return "bin"
 
 
-class AsyncMultipartUpload:
-    def __init__(
-        self,
-        *,
-        file_name: str,
-        client: httpx.AsyncClient,
-        token_manager: AsyncCDNTokenManager,
-        chunk_size: int | None = None,
-        content_type: str | None = None,
-        max_concurrency: int | None = None,
-    ) -> None:
-        self.file_name = file_name
-        self._client = client
-        self._token_manager = token_manager
-        self.chunk_size = chunk_size or MULTIPART_CHUNK_SIZE
-        self.content_type = content_type or "application/octet-stream"
-        self.max_concurrency = max_concurrency or MULTIPART_MAX_CONCURRENCY
-        self._access_url: str | None = None
-        self._upload_id: str | None = None
-        self._parts: list[dict] = []
-
-    @property
-    def access_url(self) -> str:
-        if not self._access_url:
-            raise ValueError("Upload not initiated")
-        return self._access_url
-
-    @property
-    def upload_id(self) -> str:
-        if not self._upload_id:
-            raise ValueError("Upload not initiated")
-        return self._upload_id
-
-    @property
-    async def auth_headers(self) -> dict[str, str]:
-        token = await self._token_manager.get_token()
-        return {
-            "Authorization": f"{token.token_type} {token.token}",
-            "User-Agent": "modelrunner/0.1.0",
-        }
-
-    async def create(self):
-        token = await self._token_manager.get_token()
-        url = f"{token.base_upload_url}/files/upload/multipart"
-        headers = await self.auth_headers
-        response = await _async_maybe_retry_request(
-            self._client,
-            "POST",
-            url,
-            headers={
-                **headers,
-                "Accept": "application/json",
-                "Content-Type": self.content_type,
-                "X-Modelrunner-File-Name": self.file_name,
-            },
-        )
-        result = response.json()
-        self._access_url = result["access_url"]
-        self._upload_id = result["uploadId"]
-
-    async def upload_part(self, part_number: int, data: bytes) -> None:
-        url = f"{self.access_url}/multipart/{self.upload_id}/{part_number}"
-        headers = await self.auth_headers
-
-        response = await _async_request(
-            self._client,
-            "PUT",
-            url,
-            headers={
-                **headers,
-                "Content-Type": self.content_type,
-                "Accept-Encoding": "identity",  # Keep this to ensure we get ETag headers
-            },
-            content=data,
-            timeout=None,
-        )
-
-        etag = response.headers["etag"]
-        self._parts.append(
-            {
-                "partNumber": part_number,
-                "etag": etag,
-            }
-        )
-
-    async def complete(self) -> str:
-        url = f"{self.access_url}/multipart/{self.upload_id}/complete"
-        headers = await self.auth_headers
-        await _async_maybe_retry_request(
-            self._client,
-            "POST",
-            url,
-            headers=headers,
-            json={"parts": self._parts},
-        )
-        return self.access_url
-
-    @classmethod
-    async def save(
-        cls,
-        *,
-        client: httpx.AsyncClient,
-        token_manager: AsyncCDNTokenManager,
-        file_name: str,
-        data: bytes,
-        content_type: str | None = None,
-        chunk_size: int | None = None,
-        max_concurrency: int | None = None,
-    ) -> str:
-        multipart = cls(
-            file_name=file_name,
-            client=client,
-            token_manager=token_manager,
-            chunk_size=chunk_size,
-            content_type=content_type,
-            max_concurrency=max_concurrency,
-        )
-        await multipart.create()
-        parts = math.ceil(len(data) / multipart.chunk_size)
-
-        async def upload_part(part_number: int) -> None:
-            start = (part_number - 1) * multipart.chunk_size
-            chunk = data[start : start + multipart.chunk_size]
-            await multipart.upload_part(part_number, chunk)
-
-        tasks = [
-            asyncio.create_task(upload_part(part_number))
-            for part_number in range(1, parts + 1)
-        ]
-
-        # Process concurrent uploads with semaphore to limit concurrency
-        sem = asyncio.Semaphore(multipart.max_concurrency)
-
-        async def bounded_upload(task):
-            async with sem:
-                await task
-
-        await asyncio.gather(*[bounded_upload(task) for task in tasks])
-        return await multipart.complete()
-
-    @classmethod
-    async def save_file(
-        cls,
-        *,
-        client: httpx.AsyncClient,
-        token_manager: AsyncCDNTokenManager,
-        file_path: str | Path,
-        chunk_size: int | None = None,
-        content_type: str | None = None,
-        max_concurrency: int | None = None,
-    ) -> str:
-        file_name = os.path.basename(file_path)
-        size = os.path.getsize(file_path)
-        multipart = cls(
-            file_name=file_name,
-            client=client,
-            token_manager=token_manager,
-            chunk_size=chunk_size,
-            content_type=content_type,
-            max_concurrency=max_concurrency,
-        )
-        await multipart.create()
-        parts = math.ceil(size / multipart.chunk_size)
-
-        async def upload_part(part_number: int) -> None:
-            with open(file_path, "rb") as f:
-                start = (part_number - 1) * multipart.chunk_size
-                f.seek(start)
-                data = f.read(multipart.chunk_size)
-                await multipart.upload_part(part_number, data)
-
-        tasks = [
-            asyncio.create_task(upload_part(part_number))
-            for part_number in range(1, parts + 1)
-        ]
-
-        # Process concurrent uploads with semaphore to limit concurrency
-        sem = asyncio.Semaphore(multipart.max_concurrency)
-
-        async def bounded_upload(task):
-            async with sem:
-                await task
-
-        await asyncio.gather(*[bounded_upload(task) for task in tasks])
-        return await multipart.complete()
+def _default_filename(content_type: str) -> str:
+    return f"{int(time.time() * 1000)}.{_extension_from_content_type(content_type)}"
 
 
 class ModelrunnerClientError(Exception):
@@ -855,25 +414,11 @@ class AsyncClient:
         return self.key
 
     @cached_property
-    def _token_manager(self) -> AsyncCDNTokenManager:
-        return AsyncCDNTokenManager(self._get_key())
-
-    @cached_property
     def _client(self) -> httpx.AsyncClient:
         key = self._get_key()
         return httpx.AsyncClient(
             headers={
                 "Authorization": f"Key {key}",
-                "User-Agent": USER_AGENT,
-            },
-            timeout=self.default_timeout,
-        )
-
-    async def _get_cdn_client(self) -> httpx.AsyncClient:
-        token = await self._token_manager.get_token()
-        return httpx.AsyncClient(
-            headers={
-                "Authorization": f"{token.token_type} {token.token}",
                 "User-Agent": USER_AGENT,
             },
             timeout=self.default_timeout,
@@ -899,6 +444,8 @@ class AsyncClient:
         headers = {}
         if hint is not None:
             headers["X-Modelrunner-Runner-Hint"] = hint
+
+        arguments = await self.transform_arguments(arguments)
 
         response = await _async_maybe_retry_request(
             self._client,
@@ -938,6 +485,8 @@ class AsyncClient:
 
         if priority is not None:
             headers["X-Modelrunner-Queue-Priority"] = priority
+
+        arguments = await self.transform_arguments(arguments)
 
         response = await _async_maybe_retry_request(
             self._client,
@@ -1022,6 +571,8 @@ class AsyncClient:
         if path:
             url += "/" + path.lstrip("/")
 
+        arguments = await self.transform_arguments(arguments)
+
         async with aconnect_sse(
             self._client,
             "POST",
@@ -1035,37 +586,114 @@ class AsyncClient:
     async def upload(
         self, data: str | bytes, content_type: str, file_name: str | None = None
     ) -> str:
-        """Upload the given data blob to the CDN and return the access URL. The content type should be specified
-        as the second argument. Use upload_file or upload_image for convenience."""
-
-        client = await self._get_cdn_client()
+        """Upload the given data blob and return the access URL."""
 
         if isinstance(data, str):
             data = data.encode("utf-8")
 
         if len(data) > MULTIPART_THRESHOLD:
-            if file_name is None:
-                file_name = "upload.bin"
-            return await AsyncMultipartUpload.save(
-                client=client,
-                token_manager=self._token_manager,
-                file_name=file_name,
+            return await self._multipart_upload_pre_signed(
                 data=data,
                 content_type=content_type,
+                file_name=file_name or _default_filename(content_type),
             )
 
-        headers = {"Content-Type": content_type}
-        if file_name is not None:
-            headers["X-Modelrunner-File-Name"] = file_name
-
-        response = await client.post(
-            CDN_URL + "/files/upload",
+        return await self._singlepart_upload_pre_signed(
             data=data,
-            headers=headers,
+            content_type=content_type,
+            file_name=file_name or _default_filename(content_type),
         )
-        _raise_for_status(response)
 
-        return response.json()["access_url"]
+    async def _initiate_upload(
+        self, file_name: str, content_type: str
+    ) -> tuple[str, str]:
+        resp = await _async_maybe_retry_request(
+            self._client,
+            "POST",
+            f"{REST_URL}/storage/upload/initiate",
+            json={"content_type": content_type, "file_name": file_name},
+        )
+        data = resp.json()
+        return data["upload_url"], data["file_url"]
+
+    async def _initiate_multipart_upload(
+        self, file_name: str, content_type: str
+    ) -> tuple[str, str]:
+        resp = await _async_maybe_retry_request(
+            self._client,
+            "POST",
+            f"{REST_URL}/storage/upload/initiate-multipart",
+            json={"content_type": content_type, "file_name": file_name},
+        )
+        data = resp.json()
+        return data["upload_url"], data["file_url"]
+
+    async def _singlepart_upload_pre_signed(
+        self, data: bytes, content_type: str, file_name: str
+    ) -> str:
+        upload_url, file_url = await self._initiate_upload(file_name, content_type)
+        async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as c:
+            resp = await c.put(
+                upload_url, content=data, headers={"Content-Type": content_type}
+            )
+            _raise_for_status(resp)
+        return file_url
+
+    async def _multipart_upload_pre_signed(
+        self, data: bytes, content_type: str, file_name: str
+    ) -> str:
+        upload_url, file_url = await self._initiate_multipart_upload(
+            file_name, content_type
+        )
+
+        parsed = urlparse(upload_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        base_path = parsed.path
+        query = f"?{parsed.query}" if parsed.query else ""
+
+        parts = math.ceil(len(data) / MULTIPART_CHUNK_SIZE)
+        part_results: list[dict[str, object]] = []
+
+        async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as c:
+            for i in range(parts):
+                start = i * MULTIPART_CHUNK_SIZE
+                chunk = data[start : start + MULTIPART_CHUNK_SIZE]
+                part_number = i + 1
+                part_url = f"{origin}{base_path}/{part_number}{query}"
+
+                resp = await c.put(part_url, content=chunk, timeout=None)
+                _raise_for_status(resp)
+                etag = resp.headers.get("ETag") or resp.headers.get("etag")
+                if not etag:
+                    raise ModelrunnerClientError(
+                        "Missing ETag in multipart part upload response"
+                    )
+
+                part_results.append({"partNumber": part_number, "etag": etag})
+
+            complete_url = f"{origin}{base_path}/complete{query}"
+            resp = await c.post(complete_url, json={"parts": part_results})
+            _raise_for_status(resp)
+
+        return file_url
+
+    async def transform_arguments(self, input: Any) -> Any:
+        if isinstance(input, (list, tuple)):
+            return [await self.transform_arguments(v) for v in input]
+        if isinstance(input, dict):
+            return {k: await self.transform_arguments(v) for k, v in input.items()}
+        if isinstance(input, (bytes, bytearray, memoryview)):
+            return await self.upload(bytes(input), "application/octet-stream")
+        if isinstance(input, os.PathLike):
+            return await self.upload_file(input)
+        try:
+            from PIL import Image as PILImage  # type: ignore
+
+            if isinstance(input, PILImage.Image):
+                return await self.upload_image(input)
+        except Exception:
+            pass
+        return input
 
     async def upload_file(self, path: os.PathLike) -> str:
         """Upload a file from the local filesystem to the CDN and return the access URL."""
@@ -1075,11 +703,8 @@ class AsyncClient:
             mime_type = "application/octet-stream"
 
         if os.path.getsize(path) > MULTIPART_THRESHOLD:
-            client = await self._get_cdn_client()
-            return await AsyncMultipartUpload.save_file(
+            return await self._multipart_upload_file_pre_signed(
                 file_path=path,
-                client=client,
-                token_manager=self._token_manager,
                 content_type=mime_type,
             )
 
@@ -1094,6 +719,47 @@ class AsyncClient:
         with io.BytesIO() as buffer:
             image.save(buffer, format=format)
             return await self.upload(buffer.getvalue(), f"image/{format}")
+
+    async def _multipart_upload_file_pre_signed(
+        self, file_path: os.PathLike, content_type: str
+    ) -> str:
+        file_name = os.path.basename(file_path)
+        upload_url, file_url = await self._initiate_multipart_upload(
+            file_name, content_type
+        )
+
+        parsed = urlparse(upload_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        base_path = parsed.path
+        query = f"?{parsed.query}" if parsed.query else ""
+
+        size = os.path.getsize(file_path)
+        parts = math.ceil(size / MULTIPART_CHUNK_SIZE)
+        part_results: list[dict[str, object]] = []
+
+        async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as c:
+            for part_number in range(1, parts + 1):
+                with open(file_path, "rb") as f:
+                    start = (part_number - 1) * MULTIPART_CHUNK_SIZE
+                    f.seek(start)
+                    chunk = f.read(MULTIPART_CHUNK_SIZE)
+
+                part_url = f"{origin}{base_path}/{part_number}{query}"
+                resp = await c.put(part_url, content=chunk, timeout=None)
+                _raise_for_status(resp)
+                etag = resp.headers.get("ETag") or resp.headers.get("etag")
+                if not etag:
+                    raise ModelrunnerClientError(
+                        "Missing ETag in multipart part upload response"
+                    )
+
+                part_results.append({"partNumber": part_number, "etag": etag})
+
+            complete_url = f"{origin}{base_path}/complete{query}"
+            resp = await c.post(complete_url, json={"parts": part_results})
+            _raise_for_status(resp)
+
+        return file_url
 
 
 @dataclass(frozen=True)
@@ -1118,20 +784,6 @@ class SyncClient:
             follow_redirects=True,
         )
 
-    @cached_property
-    def _token_manager(self) -> CDNTokenManager:
-        return CDNTokenManager(self._get_key())
-
-    def _get_cdn_client(self) -> httpx.Client:
-        token = self._token_manager.get_token()
-        return httpx.Client(
-            headers={
-                "Authorization": f"{token.token_type} {token.token}",
-                "User-Agent": USER_AGENT,
-            },
-            timeout=self.default_timeout,
-        )
-
     def run(
         self,
         application: str,
@@ -1152,6 +804,8 @@ class SyncClient:
         headers = {}
         if hint is not None:
             headers["X-Modelrunner-Runner-Hint"] = hint
+
+        arguments = self.transform_arguments(arguments)
 
         response = _maybe_retry_request(
             self._client,
@@ -1191,6 +845,8 @@ class SyncClient:
 
         if priority is not None:
             headers["X-Modelrunner-Queue-Priority"] = priority
+
+        arguments = self.transform_arguments(arguments)
 
         response = _maybe_retry_request(
             self._client,
@@ -1276,6 +932,8 @@ class SyncClient:
         if path:
             url += "/" + path.lstrip("/")
 
+        arguments = self.transform_arguments(arguments)
+
         with connect_sse(
             self._client, "POST", url, json=arguments, timeout=timeout
         ) as events:
@@ -1285,37 +943,110 @@ class SyncClient:
     def upload(
         self, data: str | bytes, content_type: str, file_name: str | None = None
     ) -> str:
-        """Upload the given data blob to the CDN and return the access URL. The content type should be specified
-        as the second argument. Use upload_file or upload_image for convenience."""
-
-        client = self._get_cdn_client()
+        """Upload the given data blob and return the access URL."""
 
         if isinstance(data, str):
             data = data.encode("utf-8")
 
         if len(data) > MULTIPART_THRESHOLD:
-            if file_name is None:
-                file_name = "upload.bin"
-            return MultipartUpload.save(
-                client=client,
-                token_manager=self._token_manager,
-                file_name=file_name,
+            return self._multipart_upload_pre_signed(
                 data=data,
                 content_type=content_type,
+                file_name=file_name or _default_filename(content_type),
             )
 
-        headers = {"Content-Type": content_type}
-        if file_name is not None:
-            headers["X-Modelrunner-File-Name"] = file_name
-
-        response = client.post(
-            CDN_URL + "/files/upload",
+        return self._singlepart_upload_pre_signed(
             data=data,
-            headers=headers,
+            content_type=content_type,
+            file_name=file_name or _default_filename(content_type),
         )
-        _raise_for_status(response)
 
-        return response.json()["access_url"]
+    def _initiate_upload(self, file_name: str, content_type: str) -> tuple[str, str]:
+        resp = _maybe_retry_request(
+            self._client,
+            "POST",
+            f"{REST_URL}/storage/upload/initiate",
+            json={"content_type": content_type, "file_name": file_name},
+        )
+        data = resp.json()
+        return data["upload_url"], data["file_url"]
+
+    def _initiate_multipart_upload(
+        self, file_name: str, content_type: str
+    ) -> tuple[str, str]:
+        resp = _maybe_retry_request(
+            self._client,
+            "POST",
+            f"{REST_URL}/storage/upload/initiate-multipart",
+            json={"content_type": content_type, "file_name": file_name},
+        )
+        data = resp.json()
+        return data["upload_url"], data["file_url"]
+
+    def _singlepart_upload_pre_signed(
+        self, data: bytes, content_type: str, file_name: str
+    ) -> str:
+        upload_url, file_url = self._initiate_upload(file_name, content_type)
+        with httpx.Client(headers={"User-Agent": USER_AGENT}) as c:
+            resp = c.put(
+                upload_url, content=data, headers={"Content-Type": content_type}
+            )
+            _raise_for_status(resp)
+        return file_url
+
+    def _multipart_upload_pre_signed(
+        self, data: bytes, content_type: str, file_name: str
+    ) -> str:
+        upload_url, file_url = self._initiate_multipart_upload(file_name, content_type)
+
+        parsed = urlparse(upload_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        base_path = parsed.path
+        query = f"?{parsed.query}" if parsed.query else ""
+
+        parts = math.ceil(len(data) / MULTIPART_CHUNK_SIZE)
+        part_results: list[dict[str, object]] = []
+
+        with httpx.Client(headers={"User-Agent": USER_AGENT}) as c:
+            for i in range(parts):
+                start = i * MULTIPART_CHUNK_SIZE
+                chunk = data[start : start + MULTIPART_CHUNK_SIZE]
+                part_number = i + 1
+                part_url = f"{origin}{base_path}/{part_number}{query}"
+
+                resp = c.put(part_url, content=chunk, timeout=None)
+                _raise_for_status(resp)
+                etag = resp.headers.get("ETag") or resp.headers.get("etag")
+                if not etag:
+                    raise ModelrunnerClientError(
+                        "Missing ETag in multipart part upload response"
+                    )
+
+                part_results.append({"partNumber": part_number, "etag": etag})
+
+            complete_url = f"{origin}{base_path}/complete{query}"
+            resp = c.post(complete_url, json={"parts": part_results})
+            _raise_for_status(resp)
+
+        return file_url
+
+    def transform_arguments(self, input: Any) -> Any:
+        if isinstance(input, (list, tuple)):
+            return [self.transform_arguments(v) for v in input]
+        if isinstance(input, dict):
+            return {k: self.transform_arguments(v) for k, v in input.items()}
+        if isinstance(input, (bytes, bytearray, memoryview)):
+            return self.upload(bytes(input), "application/octet-stream")
+        if isinstance(input, os.PathLike):
+            return self.upload_file(input)
+        try:
+            from PIL import Image as PILImage  # type: ignore
+
+            if isinstance(input, PILImage.Image):
+                return self.upload_image(input)
+        except Exception:
+            pass
+        return input
 
     def upload_file(self, path: os.PathLike) -> str:
         """Upload a file from the local filesystem to the CDN and return the access URL."""
@@ -1325,11 +1056,8 @@ class SyncClient:
             mime_type = "application/octet-stream"
 
         if os.path.getsize(path) > MULTIPART_THRESHOLD:
-            client = self._get_cdn_client()
-            return MultipartUpload.save_file(
+            return self._multipart_upload_file_pre_signed(
                 file_path=path,
-                client=client,
-                token_manager=self._token_manager,
                 content_type=mime_type,
             )
 
@@ -1342,6 +1070,45 @@ class SyncClient:
         with io.BytesIO() as buffer:
             image.save(buffer, format=format)
             return self.upload(buffer.getvalue(), f"image/{format}")
+
+    def _multipart_upload_file_pre_signed(
+        self, file_path: os.PathLike, content_type: str
+    ) -> str:
+        file_name = os.path.basename(file_path)
+        upload_url, file_url = self._initiate_multipart_upload(file_name, content_type)
+
+        parsed = urlparse(upload_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        base_path = parsed.path
+        query = f"?{parsed.query}" if parsed.query else ""
+
+        size = os.path.getsize(file_path)
+        parts = math.ceil(size / MULTIPART_CHUNK_SIZE)
+        part_results: list[dict[str, object]] = []
+
+        with httpx.Client(headers={"User-Agent": USER_AGENT}) as c:
+            for part_number in range(1, parts + 1):
+                with open(file_path, "rb") as f:
+                    start = (part_number - 1) * MULTIPART_CHUNK_SIZE
+                    f.seek(start)
+                    chunk = f.read(MULTIPART_CHUNK_SIZE)
+
+                part_url = f"{origin}{base_path}/{part_number}{query}"
+                resp = c.put(part_url, content=chunk, timeout=None)
+                _raise_for_status(resp)
+                etag = resp.headers.get("ETag") or resp.headers.get("etag")
+                if not etag:
+                    raise ModelrunnerClientError(
+                        "Missing ETag in multipart part upload response"
+                    )
+
+                part_results.append({"partNumber": part_number, "etag": etag})
+
+            complete_url = f"{origin}{base_path}/complete{query}"
+            resp = c.post(complete_url, json={"parts": part_results})
+            _raise_for_status(resp)
+
+        return file_url
 
 
 def encode(data: str | bytes, content_type: str) -> str:

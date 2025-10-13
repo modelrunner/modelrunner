@@ -26,7 +26,7 @@ import modelrunner_ai
 
 async def main():
     response = await modelrunner_ai.run_async("bytedance/sdxl-lightning-4step", arguments={"prompt": "two friends cooking together"})
-    print(response["images"][0]["url"])
+    print(response["output"])
 
 
 asyncio.run(main())
@@ -39,9 +39,10 @@ If the model requires files as input, you can upload them directly to media.mode
 ```python
 import modelrunner_ai
 
-input_audio = modelrunner_ai.upload_file("path/to/audio.wav")
-response = modelrunner_ai.run("meta/musicgen", arguments={"input_audio": input_audio})
-print(response["text"])
+input_image = modelrunner_ai.upload_file("./image.jpg")
+print(input_image)
+response = modelrunner_ai.run("swook/inspyrenet", arguments={"image_path": input_image})
+print(response["output"])
 ```
 
 
@@ -67,7 +68,7 @@ async def main():
             logs_index = len(event.logs)
 
     result = await response.get()
-    print(result["images"][0]["url"])
+    print(result["output"])
 
 
 asyncio.run(main())
