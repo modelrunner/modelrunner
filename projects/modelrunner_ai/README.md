@@ -25,36 +25,6 @@ import asyncio
 import modelrunner_ai
 
 async def main():
-    response = await modelrunner_ai.run_async("bytedance/sdxl-lightning-4step", arguments={"prompt": "two friends cooking together"})
-    print(response["output"])
-
-
-asyncio.run(main())
-```
-
-## Uploading files
-
-If the model requires files as input, you can upload them directly to media.modelrunner.ai (our CDN) and pass the URLs to the client. Here's an example:
-
-```python
-import modelrunner_ai
-
-input_image = modelrunner_ai.upload_file("./image.jpg")
-print(input_image)
-response = modelrunner_ai.run("swook/inspyrenet", arguments={"image_path": input_image})
-print(response["output"])
-```
-
-
-## Queuing requests
-
-When you want to send a request and keep receiving updates on its status, you can use the `submit` method. Here's an example:
-
-```python
-import asyncio
-import modelrunner_ai
-
-async def main():
     response = await modelrunner_ai.submit_async("bytedance/sdxl-lightning-4step", arguments={"prompt": "two friends cooking together"})
 
     logs_index = 0
@@ -73,4 +43,18 @@ async def main():
 
 asyncio.run(main())
 ```
+
+## Uploading files
+
+If the model requires files as input, you can upload them directly to media.modelrunner.ai (our CDN) and pass the URLs to the client. Here's an example:
+
+```python
+import modelrunner_ai
+
+input_image = modelrunner_ai.upload_file("./image.jpg")
+print(input_image)
+response = modelrunner_ai.run("swook/inspyrenet", arguments={"image_path": input_image})
+print(response["output"])
+```
+
 
