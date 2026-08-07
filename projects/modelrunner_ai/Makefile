@@ -21,4 +21,6 @@ apidoc:
 html:
 	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-docs: apidoc html
+# clean first: --fresh-env rebuilds the doctree cache but leaves stale output
+# files behind, so pages for renamed or removed modules would survive forever.
+docs: clean apidoc html

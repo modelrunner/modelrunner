@@ -4,7 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 root = "../../"
-git_describe_command= 'git describe --tags --abbrev=0 --dirty --match "modelrunner_ai_v*"'
+# Do NOT add --abbrev=0 here. It collapses describe's output to a bare tag name,
+# which hides the commit distance and makes setuptools_scm read *every* commit as
+# an exact release -- so building an untagged commit silently reproduces the last
+# released version instead of a .devN version. --long keeps the distance visible.
+git_describe_command = 'git describe --tags --long --dirty --match "modelrunner_ai_v*"'
 tag_regex = "^modelrunner_ai_v(?P<version>.*)$"
 
 [project]

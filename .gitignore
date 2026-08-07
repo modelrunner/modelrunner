@@ -4,6 +4,10 @@ dist/
 *.egg-info/
 .pytest_cache/
 
+# Sphinx output. Note "build/" above does NOT match "_build/", so this needs its
+# own entry -- without it the generated HTML gets committed and shipped in the sdist.
+_build/
+
 # pyenv
 .python-version
 

@@ -41,15 +41,54 @@ jobs:
           BUMP_VERSION: ${{ github.event.inputs.bump_version }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          set -xeo pipefail
-          last_tag=$(git describe --tags --abbrev=0 --match "${PROJECT_NAME}_v*")
-          regex="^${PROJECT_NAME}_v([0-9]*).([0-9]*).([0-9]*)$"
-          [[ $last_tag =~ $regex ]] || $(echo "failed to parse last tag '$last_tag'" && exit 1)
+          set -eo pipefail
+
+          # Pick the highest *version* tag. `git describe` walks by commit distance
+          # and chooses arbitrarily between two tags on one commit, which is how
+          # earlier bumps resolved to the lower version and republished it.
+          last_tag=$(git tag --list "${PROJECT_NAME}_v*" --sort=-version:refname | head -n1)
+          if [ -z "$last_tag" ]; then
+            echo "::error::no existing ${PROJECT_NAME}_v* tag to bump from"
+            exit 1
+          fi
+
+          regex="^${PROJECT_NAME}_v([0-9]+)\.([0-9]+)\.([0-9]+)$"
+          if [[ ! $last_tag =~ $regex ]]; then
+            echo "::error::failed to parse last tag '$last_tag'"
+            exit 1
+          fi
           major=${BASH_REMATCH[1]}
           minor=${BASH_REMATCH[2]}
           patch=${BASH_REMATCH[3]}
-          if [ $BUMP_VERSION == "major" ]; then version="$((major + 1)).0.0"; fi
-          if [ $BUMP_VERSION == "minor" ]; then version="$major.$((minor + 1)).0"; fi
-          if [ $BUMP_VERSION == "patch" ]; then version="$major.$minor.$((patch + 1))"; fi
-          git log $last_tag...HEAD --pretty=format:'*  %s' --reverse -- projects/$PROJECT_NAME/ > /tmp/notes.txt
-          gh release create ${PROJECT_NAME}_v$version --title ${PROJECT_NAME}_v$version --notes-file /tmp/notes.txt
+
+          case "$BUMP_VERSION" in
+            major) version="$((major + 1)).0.0" ;;
+            minor) version="$major.$((minor + 1)).0" ;;
+            patch) version="$major.$minor.$((patch + 1))" ;;
+            *) echo "::error::unknown bump_version '$BUMP_VERSION'"; exit 1 ;;
+          esac
+          new_tag="${PROJECT_NAME}_v${version}"
+
+          # Two tags on one commit is exactly what breaks version resolution in
+          # the PyPI release workflow, so refuse to create that state.
+          if git rev-parse -q --verify "refs/tags/$new_tag" >/dev/null; then
+            echo "::error::tag $new_tag already exists; choose a different bump"
+            exit 1
+          fi
+          already=$(git tag --points-at HEAD --list "${PROJECT_NAME}_v*")
+          if [ -n "$already" ]; then
+            echo "::error::HEAD is already tagged $already -- release that tag via the"
+            echo "::error::PyPI release workflow instead of adding a second tag to one commit."
+            exit 1
+          fi
+
+          echo "Bumping $last_tag -> $new_tag ($BUMP_VERSION)"
+          git log "$last_tag..HEAD" --pretty=format:'*  %s' --reverse \
+            -- "projects/$PROJECT_NAME/" > /tmp/notes.txt
+          if [ ! -s /tmp/notes.txt ]; then
+            echo "::error::no commits touching projects/$PROJECT_NAME since $last_tag"
+            exit 1
+          fi
+          cat /tmp/notes.txt
+
+          gh release create "$new_tag" --title "$new_tag" --notes-file /tmp/notes.txt

@@ -20,6 +20,22 @@ modelrunner\_ai.client module
    :show-inheritance:
    :undoc-members:
 
+modelrunner\_ai.metadata module
+-------------------------------
+
+.. automodule:: modelrunner_ai.metadata
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modelrunner\_ai.webhooks module
+-------------------------------
+
+.. automodule:: modelrunner_ai.webhooks
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 Module contents
 ---------------
 

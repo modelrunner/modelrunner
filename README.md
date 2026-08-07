@@ -57,4 +57,11 @@ response = modelrunner_ai.run("swook/inspyrenet", arguments={"image_path": input
 print(response["output"])
 ```
 
+For webhooks and request metadata, see the
+[package README](projects/modelrunner_ai/README.md).
+
+## Releasing
+
+See [RELEASING.md](RELEASING.md).
+
 

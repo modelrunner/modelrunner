@@ -47,6 +47,40 @@ jobs:
         working-directory: projects/${{ steps.parse.outputs.name }}
         run: python -m build
 
+      # Guard against publishing a version that is not the one the tag names.
+      # setuptools_scm derives the version from `git describe`, so anything that
+      # makes describe resolve to the wrong tag -- most notably two
+      # <project>_v* tags pointing at the same commit -- would otherwise upload
+      # the wrong version to PyPI with a fully green run. Fail loudly instead.
+      - name: Verify built version matches the release tag
+        working-directory: projects/${{ steps.parse.outputs.name }}
+        env:
+          EXPECTED_VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          python - <<'PY'
+          import glob, os, sys
+          from packaging.utils import parse_wheel_filename
+          from packaging.version import Version
+
+          expected = Version(os.environ["EXPECTED_VERSION"])
+          wheels = glob.glob("dist/*.whl")
+          if len(wheels) != 1:
+              sys.exit(f"::error::expected exactly one wheel in dist/, found {wheels}")
+
+          built = parse_wheel_filename(os.path.basename(wheels[0]))[1]
+          print(f"tag version:   {expected}")
+          print(f"built version: {built}")
+
+          if built != expected:
+              sys.exit(
+                  f"::error::built version {built} does not match release tag "
+                  f"version {expected}; refusing to publish. Check that exactly one "
+                  f"tag matching the project prefix points at this commit "
+                  f"(git tag --points-at HEAD)."
+              )
+          print("OK: built version matches the tag")
+          PY
+
       - name: Upload dist
         uses: actions/upload-artifact@v4
         with:
