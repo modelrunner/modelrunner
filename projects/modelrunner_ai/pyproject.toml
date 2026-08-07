@@ -28,6 +28,10 @@ docs = [
     "sphinx",
     "sphinx-rtd-theme",
     "sphinx-autodoc-typehints",
+    # client.py imports PIL.Image under TYPE_CHECKING only. Without Pillow
+    # installed, sphinx-autodoc-typehints cannot resolve the `Image.Image`
+    # forward references on upload_image/encode_image and renders them broken.
+    "pillow",
 ]
 test = [
     "pytest",
