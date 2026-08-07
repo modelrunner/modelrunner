@@ -11,12 +11,22 @@ import base64
 import logging
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, AsyncIterator, Dict, Iterator, TYPE_CHECKING, Optional, Literal
-from urllib.parse import urlencode, urlparse
+from typing import (
+    Any,
+    AsyncIterator,
+    Dict,
+    Iterator,
+    Literal,
+    Optional,
+    Sequence,
+    TYPE_CHECKING,
+)
+from urllib.parse import urlparse
 
 import httpx
 from httpx_sse import aconnect_sse, connect_sse
 from modelrunner_ai.auth import MODELRUNNER_RUN_HOST, fetch_credentials
+from modelrunner_ai.webhooks import webhook_body_keys
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +39,8 @@ Priority = Literal["normal", "low"]
 RUN_URL_FORMAT = f"https://{MODELRUNNER_RUN_HOST}/"
 QUEUE_URL_FORMAT = f"https://queue.{MODELRUNNER_RUN_HOST}/"
 REST_URL = "https://modelrunner.run"
-USER_AGENT = "modelrunner-ai/0.2.2 (python)"
+USER_AGENT = "modelrunner-ai/0.3.0 (python)"
+WEBHOOK_SECRET_URL = f"{REST_URL}/webhooks/default/secret"
 
 
 MULTIPART_THRESHOLD = 90 * 1024 * 1024
@@ -466,18 +477,22 @@ class AsyncClient:
         path: str = "",
         hint: str | None = None,
         webhook_url: str | None = None,
+        webhook_events: Sequence[str] | None = None,
         priority: Optional[Priority] = None,
     ) -> AsyncRequestHandle:
         """Submit an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return a handle to the request that can be used to check the status
-        and retrieve the result of the inference call when it is done."""
+        and retrieve the result of the inference call when it is done.
+
+        Pass webhook_url to be called back when the request finishes, instead of
+        polling the handle. webhook_events selects which lifecycle events to be
+        notified about and defaults to ["completed"]; "start" is best effort. Use
+        modelrunner_ai.verify_webhook to check the signature on every delivery.
+        """
 
         url = QUEUE_URL_FORMAT + application
         if path:
             url += "/" + path.lstrip("/")
-
-        if webhook_url is not None:
-            url += "?" + urlencode({"modelrunner_webhook": webhook_url})
 
         headers = {}
         if hint is not None:
@@ -488,12 +503,22 @@ class AsyncClient:
 
         arguments = await self.transform_arguments(arguments)
 
+        # Merged after the transform, so the webhook url is never mistaken for a
+        # file to upload, and without mutating the caller's dict.
+        webhook_keys = webhook_body_keys(webhook_url, webhook_events)
+        if webhook_keys:
+            arguments = {**arguments, **webhook_keys}
+
         response = await _async_maybe_retry_request(
             self._client,
             "POST",
             url,
             json=arguments,
             timeout=self.default_timeout,
+            # NOTE: this argument was missing, so hint and priority were built
+            # and then silently dropped on the async client only. Unrelated to
+            # webhooks; fixed here because this call site was being rewritten.
+            headers=headers,
         )
         _raise_for_status(response)
 
@@ -517,6 +542,8 @@ class AsyncClient:
         on_enqueue: Optional[callable[[Queued], None]] = None,
         on_queue_update: Optional[callable[[Status], None]] = None,
         priority: Optional[Priority] = None,
+        webhook_url: str | None = None,
+        webhook_events: Sequence[str] | None = None,
     ) -> AnyJSON:
         handle = await self.submit(
             application,
@@ -524,6 +551,8 @@ class AsyncClient:
             path=path,
             hint=hint,
             priority=priority,
+            webhook_url=webhook_url,
+            webhook_events=webhook_events,
         )
 
         if on_enqueue is not None:
@@ -534,6 +563,40 @@ class AsyncClient:
                 on_queue_update(event)
 
         return await handle.get()
+
+    async def get_webhook_secret(self) -> str:
+        """Return the account's webhook signing secret, creating it on first call.
+
+        The same secret comes back on every call until it is rotated, so fetch it
+        once and keep it in the receiver's environment rather than calling this
+        per delivery. Treat it like a password.
+        """
+
+        response = await _async_maybe_retry_request(
+            self._client, "GET", WEBHOOK_SECRET_URL, timeout=self.default_timeout
+        )
+        _raise_for_status(response)
+        return response.json()["key"]
+
+    async def rotate_webhook_secret(self) -> str:
+        """Rotate the account's webhook signing secret and return the new one.
+
+        The previous secret keeps being signed with alongside the new one for 24
+        hours, so deployments have that long to pick the new value up.
+
+        Deliberately NOT retried: rotation is monotonic and only the immediately
+        previous secret stays valid, so a retry after the server already
+        committed would skip a version and cut off receivers still holding the
+        secret this call was meant to replace.
+        """
+
+        response = await _async_request(
+            self._client,
+            "POST",
+            f"{WEBHOOK_SECRET_URL}/rotate",
+            timeout=self.default_timeout,
+        )
+        return response.json()["key"]
 
     def get_handle(self, application: str, request_id: str) -> AsyncRequestHandle:
         return AsyncRequestHandle.from_request_id(self._client, application, request_id)
@@ -826,18 +889,22 @@ class SyncClient:
         path: str = "",
         hint: str | None = None,
         webhook_url: str | None = None,
+        webhook_events: Sequence[str] | None = None,
         priority: Optional[Priority] = None,
     ) -> SyncRequestHandle:
         """Submit an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return a handle to the request that can be used to check the status
-        and retrieve the result of the inference call when it is done."""
+        and retrieve the result of the inference call when it is done.
+
+        Pass webhook_url to be called back when the request finishes, instead of
+        polling the handle. webhook_events selects which lifecycle events to be
+        notified about and defaults to ["completed"]; "start" is best effort. Use
+        modelrunner_ai.verify_webhook to check the signature on every delivery.
+        """
 
         url = QUEUE_URL_FORMAT + application
         if path:
             url += "/" + path.lstrip("/")
-
-        if webhook_url is not None:
-            url += "?" + urlencode({"modelrunner_webhook": webhook_url})
 
         headers = {}
         if hint is not None:
@@ -847,6 +914,12 @@ class SyncClient:
             headers["X-Modelrunner-Queue-Priority"] = priority
 
         arguments = self.transform_arguments(arguments)
+
+        # Merged after the transform, so the webhook url is never mistaken for a
+        # file to upload, and without mutating the caller's dict.
+        webhook_keys = webhook_body_keys(webhook_url, webhook_events)
+        if webhook_keys:
+            arguments = {**arguments, **webhook_keys}
 
         response = _maybe_retry_request(
             self._client,
@@ -878,6 +951,8 @@ class SyncClient:
         on_enqueue: Optional[callable[[Queued], None]] = None,
         on_queue_update: Optional[callable[[Status], None]] = None,
         priority: Optional[Priority] = None,
+        webhook_url: str | None = None,
+        webhook_events: Sequence[str] | None = None,
     ) -> AnyJSON:
         handle = self.submit(
             application,
@@ -885,6 +960,8 @@ class SyncClient:
             path=path,
             hint=hint,
             priority=priority,
+            webhook_url=webhook_url,
+            webhook_events=webhook_events,
         )
 
         if on_enqueue is not None:
@@ -895,6 +972,40 @@ class SyncClient:
                 on_queue_update(event)
 
         return handle.get()
+
+    def get_webhook_secret(self) -> str:
+        """Return the account's webhook signing secret, creating it on first call.
+
+        The same secret comes back on every call until it is rotated, so fetch it
+        once and keep it in the receiver's environment rather than calling this
+        per delivery. Treat it like a password.
+        """
+
+        response = _maybe_retry_request(
+            self._client, "GET", WEBHOOK_SECRET_URL, timeout=self.default_timeout
+        )
+        _raise_for_status(response)
+        return response.json()["key"]
+
+    def rotate_webhook_secret(self) -> str:
+        """Rotate the account's webhook signing secret and return the new one.
+
+        The previous secret keeps being signed with alongside the new one for 24
+        hours, so deployments have that long to pick the new value up.
+
+        Deliberately NOT retried: rotation is monotonic and only the immediately
+        previous secret stays valid, so a retry after the server already
+        committed would skip a version and cut off receivers still holding the
+        secret this call was meant to replace.
+        """
+
+        response = _request(
+            self._client,
+            "POST",
+            f"{WEBHOOK_SECRET_URL}/rotate",
+            timeout=self.default_timeout,
+        )
+        return response.json()["key"]
 
     def get_handle(self, application: str, request_id: str) -> SyncRequestHandle:
         return SyncRequestHandle.from_request_id(self._client, application, request_id)

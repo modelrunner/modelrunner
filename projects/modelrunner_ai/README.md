@@ -57,4 +57,89 @@ response = modelrunner_ai.run("swook/inspyrenet", arguments={"image_path": input
 print(response["output"])
 ```
 
+## Webhooks
+
+Instead of polling a handle, you can have `modelrunner.ai` call you back. This is the only option that survives a restart on either side, which is what makes it the right choice for multi-minute video and training jobs.
+
+```python
+import modelrunner_ai
+
+handle = modelrunner_ai.submit(
+    "bytedance/sdxl-lightning-4step",
+    arguments={"prompt": "two friends cooking together"},
+    webhook_url="https://example.com/webhooks/modelrunner",
+    # optional — defaults to ["completed"]
+    webhook_events=["start", "completed"],
+)
+```
+
+`start` is best effort: a fast request can go straight from `IN_QUEUE` to `COMPLETED` between two polls, in which case only `completed` is delivered. Never block waiting for `start`.
+
+> **Changed in 0.3.0.** `webhook_url` was previously accepted and **silently ignored** — it was sent as a query parameter the API does not read, so no callback was ever made. It is now sent correctly, which also means it is now validated: a value carried over from before (one over 2048 characters, say) turns a submit that used to succeed into an error.
+
+### Verifying a delivery
+
+Every delivery is signed with [Standard Webhooks](https://www.standardwebhooks.com). Fetch your secret **once** and keep it in your receiver's environment:
+
+```python
+secret = modelrunner_ai.get_webhook_secret()
+```
+
+Then verify each delivery against the **raw** request body — the signature covers the delivered bytes, so a body that has been parsed and re-serialized will not verify:
+
+```python
+import os
+from fastapi import FastAPI, Request, Response
+from modelrunner_ai import WebhookVerificationError, verify_webhook
+
+app = FastAPI()
+SECRET = os.environ["MODELRUNNER_WEBHOOK_SECRET"]
+
+@app.post("/webhooks/modelrunner")
+async def receive(request: Request):
+    try:
+        payload = verify_webhook(
+            SECRET,
+            request.headers,
+            await request.body(),  # raw bytes, before any JSON parsing
+        )
+    except WebhookVerificationError:
+        return Response(status_code=401)
+
+    handle(payload)
+    return Response(status_code=200)
+```
+
+In Flask the raw body is `request.get_data()`.
+
+`verify_webhook` raises `WebhookVerificationError` on a missing header, a timestamp outside the 5-minute tolerance, or a signature that does not match. Treat every case the same way and never branch on the message.
+
+### What your endpoint must do
+
+- **Respond `2xx` directly.** Redirects are never followed, so a `301` — a missing trailing slash, an `http`→`https` upgrade, a `www.` canonicalization — is recorded as a *failed* attempt and you will see nothing but silence.
+- **Deduplicate on the `webhook-id` header.** Delivery is at-least-once and that id is stable across retries.
+- A failed attempt is retried on a fixed schedule, roughly 10 times over 2 hours. Reply **`410 Gone`** to stop delivery permanently.
+- Acknowledge before doing slow work. The attempt has a timeout, and a slow `200` is a failed attempt.
+
+### Reading the payload
+
+The payload is the same object the result endpoint returns, plus `event` and `billingStatus`. Timestamps are ISO-8601 strings.
+
+> 🚨 **`status` alone cannot tell success from failure.** A failed generation is normalized to `status: "COMPLETED"` with `billingStatus: "failed"`. Code that keys off `status` reads every failure as a success — use `billingStatus`.
+
+```python
+if payload["event"] == "completed" and payload["billingStatus"] != "failed":
+    print(payload["output"])
+```
+
+`input` is replaced by `{"_elided": "..."}` when it serializes to more than 64KB; fetch the request itself in that case.
+
+### Rotating the secret
+
+```python
+secret = modelrunner_ai.rotate_webhook_secret()
+```
+
+Both the old and the new secret are signed with for **24 hours** afterwards, so you have that long to deploy the new value. `verify_webhook` accepts a list of secrets to bridge the gap. Rotating twice inside that window ends it early and breaks receivers still holding the original secret, so this call is never retried automatically.
+
 

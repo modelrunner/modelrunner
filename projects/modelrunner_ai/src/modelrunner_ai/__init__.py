@@ -11,6 +11,11 @@ from modelrunner_ai.client import (
     encode_file,
     encode_image,
 )
+from modelrunner_ai.webhooks import (
+    WEBHOOK_EVENTS,
+    WebhookVerificationError,
+    verify_webhook,
+)
 
 __all__ = [
     "SyncClient",
@@ -21,6 +26,13 @@ __all__ = [
     "Completed",
     "SyncRequestHandle",
     "AsyncRequestHandle",
+    "WEBHOOK_EVENTS",
+    "WebhookVerificationError",
+    "verify_webhook",
+    "get_webhook_secret",
+    "get_webhook_secret_async",
+    "rotate_webhook_secret",
+    "rotate_webhook_secret_async",
     "run",
     "subscribe_async",
     "subscribe",
@@ -51,6 +63,8 @@ stream = sync_client.stream
 upload = sync_client.upload
 upload_file = sync_client.upload_file
 upload_image = sync_client.upload_image
+get_webhook_secret = sync_client.get_webhook_secret
+rotate_webhook_secret = sync_client.rotate_webhook_secret
 
 async_client = AsyncClient()
 run_async = async_client.run
@@ -63,3 +77,5 @@ stream_async = async_client.stream
 upload_async = async_client.upload
 upload_file_async = async_client.upload_file
 upload_image_async = async_client.upload_image
+get_webhook_secret_async = async_client.get_webhook_secret
+rotate_webhook_secret_async = async_client.rotate_webhook_secret
