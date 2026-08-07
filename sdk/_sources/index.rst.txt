@@ -1,15 +1,10 @@
-.. modelrunner_client documentation master file, created by
-   sphinx-quickstart on Wed Oct  2 04:10:59 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+modelrunner_ai documentation
+============================
 
-modelrunner_client documentation
-========================
+Python client for `modelrunner.ai <https://modelrunner.ai>`_.
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
+See the `README <https://github.com/modelrunner/modelrunner/blob/main/projects/modelrunner_ai/README.md>`_
+for usage examples, and the API reference below for the full surface.
 
 .. toctree::
    :maxdepth: 2
