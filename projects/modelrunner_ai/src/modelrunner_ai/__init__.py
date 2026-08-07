@@ -11,6 +11,10 @@ from modelrunner_ai.client import (
     encode_file,
     encode_image,
 )
+from modelrunner_ai.metadata import (
+    REQUEST_METADATA_MAX_KEYS,
+    validate_metadata,
+)
 from modelrunner_ai.webhooks import (
     WEBHOOK_EVENTS,
     WebhookVerificationError,
@@ -26,6 +30,8 @@ __all__ = [
     "Completed",
     "SyncRequestHandle",
     "AsyncRequestHandle",
+    "REQUEST_METADATA_MAX_KEYS",
+    "validate_metadata",
     "WEBHOOK_EVENTS",
     "WebhookVerificationError",
     "verify_webhook",

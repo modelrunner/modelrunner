@@ -17,6 +17,7 @@ from typing import (
     Dict,
     Iterator,
     Literal,
+    Mapping,
     Optional,
     Sequence,
     TYPE_CHECKING,
@@ -26,6 +27,7 @@ from urllib.parse import urlparse
 import httpx
 from httpx_sse import aconnect_sse, connect_sse
 from modelrunner_ai.auth import MODELRUNNER_RUN_HOST, fetch_credentials
+from modelrunner_ai.metadata import metadata_body_keys
 from modelrunner_ai.webhooks import webhook_body_keys
 
 logger = logging.getLogger(__name__)
@@ -443,9 +445,13 @@ class AsyncClient:
         path: str = "",
         timeout: float | None = None,
         hint: str | None = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> AnyJSON:
         """Run an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return the result of the inference call directly.
+
+        metadata is an optional flat map of your own string tags stored on the
+        request. It is never sent to the model.
         """
 
         url = RUN_URL_FORMAT + application
@@ -457,6 +463,12 @@ class AsyncClient:
             headers["X-Modelrunner-Runner-Hint"] = hint
 
         arguments = await self.transform_arguments(arguments)
+
+        # Merged after the transform, so nothing in the map is mistaken for a
+        # file to upload, and without mutating the caller's dict.
+        metadata_keys = metadata_body_keys(metadata)
+        if metadata_keys:
+            arguments = {**arguments, **metadata_keys}
 
         response = await _async_maybe_retry_request(
             self._client,
@@ -479,6 +491,7 @@ class AsyncClient:
         webhook_url: str | None = None,
         webhook_events: Sequence[str] | None = None,
         priority: Optional[Priority] = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> AsyncRequestHandle:
         """Submit an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return a handle to the request that can be used to check the status
@@ -506,8 +519,9 @@ class AsyncClient:
         # Merged after the transform, so the webhook url is never mistaken for a
         # file to upload, and without mutating the caller's dict.
         webhook_keys = webhook_body_keys(webhook_url, webhook_events)
-        if webhook_keys:
-            arguments = {**arguments, **webhook_keys}
+        metadata_keys = metadata_body_keys(metadata)
+        if webhook_keys or metadata_keys:
+            arguments = {**arguments, **webhook_keys, **metadata_keys}
 
         response = await _async_maybe_retry_request(
             self._client,
@@ -544,6 +558,7 @@ class AsyncClient:
         priority: Optional[Priority] = None,
         webhook_url: str | None = None,
         webhook_events: Sequence[str] | None = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> AnyJSON:
         handle = await self.submit(
             application,
@@ -553,6 +568,7 @@ class AsyncClient:
             priority=priority,
             webhook_url=webhook_url,
             webhook_events=webhook_events,
+            metadata=metadata,
         )
 
         if on_enqueue is not None:
@@ -622,6 +638,7 @@ class AsyncClient:
         *,
         path: str = "/stream",
         timeout: float | None = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream the output of an application with the given arguments (which will be JSON serialized). This is only supported
         at a few select applications at the moment, so be sure to first consult with the documentation of individual applications
@@ -635,6 +652,10 @@ class AsyncClient:
             url += "/" + path.lstrip("/")
 
         arguments = await self.transform_arguments(arguments)
+
+        metadata_keys = metadata_body_keys(metadata)
+        if metadata_keys:
+            arguments = {**arguments, **metadata_keys}
 
         async with aconnect_sse(
             self._client,
@@ -855,9 +876,13 @@ class SyncClient:
         path: str = "",
         timeout: float | None = None,
         hint: str | None = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> AnyJSON:
         """Run an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return the result of the inference call directly.
+
+        metadata is an optional flat map of your own string tags stored on the
+        request. It is never sent to the model.
         """
 
         url = RUN_URL_FORMAT + application
@@ -869,6 +894,12 @@ class SyncClient:
             headers["X-Modelrunner-Runner-Hint"] = hint
 
         arguments = self.transform_arguments(arguments)
+
+        # Merged after the transform, so nothing in the map is mistaken for a
+        # file to upload, and without mutating the caller's dict.
+        metadata_keys = metadata_body_keys(metadata)
+        if metadata_keys:
+            arguments = {**arguments, **metadata_keys}
 
         response = _maybe_retry_request(
             self._client,
@@ -891,6 +922,7 @@ class SyncClient:
         webhook_url: str | None = None,
         webhook_events: Sequence[str] | None = None,
         priority: Optional[Priority] = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> SyncRequestHandle:
         """Submit an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return a handle to the request that can be used to check the status
@@ -918,8 +950,9 @@ class SyncClient:
         # Merged after the transform, so the webhook url is never mistaken for a
         # file to upload, and without mutating the caller's dict.
         webhook_keys = webhook_body_keys(webhook_url, webhook_events)
-        if webhook_keys:
-            arguments = {**arguments, **webhook_keys}
+        metadata_keys = metadata_body_keys(metadata)
+        if webhook_keys or metadata_keys:
+            arguments = {**arguments, **webhook_keys, **metadata_keys}
 
         response = _maybe_retry_request(
             self._client,
@@ -953,6 +986,7 @@ class SyncClient:
         priority: Optional[Priority] = None,
         webhook_url: str | None = None,
         webhook_events: Sequence[str] | None = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> AnyJSON:
         handle = self.submit(
             application,
@@ -962,6 +996,7 @@ class SyncClient:
             priority=priority,
             webhook_url=webhook_url,
             webhook_events=webhook_events,
+            metadata=metadata,
         )
 
         if on_enqueue is not None:
@@ -1031,6 +1066,7 @@ class SyncClient:
         *,
         path: str = "/stream",
         timeout: float | None = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> Iterator[dict[str, Any]]:
         """Stream the output of an application with the given arguments (which will be JSON serialized). This is only supported
         at a few select applications at the moment, so be sure to first consult with the documentation of individual applications
@@ -1044,6 +1080,10 @@ class SyncClient:
             url += "/" + path.lstrip("/")
 
         arguments = self.transform_arguments(arguments)
+
+        metadata_keys = metadata_body_keys(metadata)
+        if metadata_keys:
+            arguments = {**arguments, **metadata_keys}
 
         with connect_sse(
             self._client, "POST", url, json=arguments, timeout=timeout

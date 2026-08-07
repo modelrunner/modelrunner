@@ -57,6 +57,32 @@ response = modelrunner_ai.run("swook/inspyrenet", arguments={"image_path": input
 print(response["output"])
 ```
 
+## Tagging requests with metadata
+
+Attach a flat map of your own string tags to a request — job ids, environments, batch labels — with `metadata`. It is stored on the request and never sent to the model.
+
+```python
+import modelrunner_ai
+
+result = modelrunner_ai.run(
+    "bytedance/sdxl-lightning-4step",
+    arguments={"prompt": "two friends cooking together"},
+    metadata={"project": "onboarding-demo", "env": "prod"},
+)
+```
+
+Supported on `run`, `submit`, `subscribe` and `stream` (and their `_async` variants). The limits are checked locally before the request is sent, with every violation reported at once:
+
+| Constraint | Value |
+| --- | --- |
+| Max keys | 16 |
+| Key length | 1–64 characters |
+| Values | strings only, ≤512 characters |
+
+> **New in 0.3.0.** Earlier versions did not accept `metadata` at all — passing it raised `TypeError`.
+
+`metadata` is reserved at the top level of the request body, so a model whose own input schema declares a `metadata` field cannot receive it this way.
+
 ## Webhooks
 
 Instead of polling a handle, you can have `modelrunner.ai` call you back. This is the only option that survives a restart on either side, which is what makes it the right choice for multi-minute video and training jobs.
