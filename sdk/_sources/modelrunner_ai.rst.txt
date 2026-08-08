@@ -28,6 +28,14 @@ modelrunner\_ai.metadata module
    :show-inheritance:
    :undoc-members:
 
+modelrunner\_ai.storage module
+------------------------------
+
+.. automodule:: modelrunner_ai.storage
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 modelrunner\_ai.webhooks module
 -------------------------------
 
