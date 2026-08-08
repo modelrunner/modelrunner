@@ -28,6 +28,11 @@ import httpx
 from httpx_sse import aconnect_sse, connect_sse
 from modelrunner_ai.auth import MODELRUNNER_RUN_HOST, fetch_credentials
 from modelrunner_ai.metadata import metadata_body_keys
+from modelrunner_ai.storage import (
+    StorageSettings,
+    object_lifecycle_headers,
+    store_io_headers,
+)
 from modelrunner_ai.webhooks import webhook_body_keys
 
 logger = logging.getLogger(__name__)
@@ -41,13 +46,80 @@ Priority = Literal["normal", "low"]
 RUN_URL_FORMAT = f"https://{MODELRUNNER_RUN_HOST}/"
 QUEUE_URL_FORMAT = f"https://queue.{MODELRUNNER_RUN_HOST}/"
 REST_URL = "https://modelrunner.run"
-USER_AGENT = "modelrunner-ai/0.4.0 (python)"
+USER_AGENT = "modelrunner-ai/0.5.0 (python)"
 WEBHOOK_SECRET_URL = f"{REST_URL}/webhooks/default/secret"
 
 
 MULTIPART_THRESHOLD = 90 * 1024 * 1024
 MULTIPART_CHUNK_SIZE = 10 * 1024 * 1024
 MULTIPART_MAX_CONCURRENCY = 10
+
+RUNNER_HINT_HEADER = "x-modelrunner-runner-hint"
+QUEUE_PRIORITY_HEADER = "x-modelrunner-queue-priority"
+
+#: Headers the SSE transport owns and sets on every stream. httpx_sse writes
+#: them capitalized into the dict it is handed, and httpx keeps names that
+#: differ only in case as separate entries, so a lowercase copy from a caller
+#: would be sent alongside rather than replaced -- two Accept lines, which a
+#: strict server reads as one combined value.
+_SSE_RESERVED_HEADERS = ("accept", "cache-control")
+
+
+def _build_headers(
+    *,
+    headers: Optional[Mapping[str, str]] = None,
+    hint: str | None = None,
+    priority: Optional[Priority] = None,
+    lifecycle: Optional[StorageSettings] = None,
+    store_io: Optional[bool] = None,
+) -> Dict[str, str]:
+    """Build the per-request headers for a call.
+
+    Raw ``headers`` go in first and every typed option is applied over them, so
+    passing both ``priority="low"`` and a raw queue-priority header resolves to
+    the typed value rather than to whichever httpx happened to send last.
+
+    Every name is lowercased -- including the typed ones, which this client used
+    to send capitalized. Header names are case-insensitive on the wire, but a
+    plain dict is not, so without normalizing here a raw
+    ``x-modelrunner-runner-hint`` alongside ``hint=`` would survive as two
+    entries and be sent as two headers.
+
+    Returns per-request headers only. httpx merges these over the client-level
+    defaults, so ``Authorization`` and ``User-Agent`` stay in place unless a
+    caller deliberately overrides them by name.
+
+    :raises ValueError: if a raw header name or value is not a string, or if a
+        typed option is not valid.
+    """
+
+    built: Dict[str, str] = {}
+
+    if headers is not None:
+        if not isinstance(headers, Mapping):
+            raise ValueError(
+                "headers must be a mapping of string keys to string values"
+            )
+        for key, value in headers.items():
+            if not isinstance(key, str):
+                raise ValueError(f"header name {key!r} must be a string")
+            if not isinstance(value, str):
+                raise ValueError(
+                    f"header value for {key!r} must be a string "
+                    f"(got {type(value).__name__})"
+                )
+            built[key.lower()] = value
+
+    if hint is not None:
+        built[RUNNER_HINT_HEADER] = hint
+
+    if priority is not None:
+        built[QUEUE_PRIORITY_HEADER] = priority
+
+    built.update(object_lifecycle_headers(lifecycle))
+    built.update(store_io_headers(store_io))
+
+    return built
 
 
 def _extension_from_content_type(content_type: str) -> str:
@@ -458,6 +530,9 @@ class AsyncClient:
         timeout: float | None = None,
         hint: str | None = None,
         metadata: Mapping[str, str] | None = None,
+        lifecycle: StorageSettings | None = None,
+        store_io: bool | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> AnyJSON:
         """Run an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return the result of the inference call directly.
@@ -468,15 +543,28 @@ class AsyncClient:
 
         metadata is an optional flat map of your own string tags stored on the
         request. It is never sent to the model.
+
+        lifecycle sets how long the generated media is kept before it expires,
+        and store_io=False opts the request and response payloads out of being
+        stored at all. Both apply to this request only, overriding the
+        account-wide default -- though neither can widen a limit the account
+        already enforces.
+
+        headers is a raw escape hatch for request headers this client does not
+        model yet. The typed options above take precedence over the same header
+        passed this way.
         """
 
         url = RUN_URL_FORMAT + application
         if path:
             url += "/" + path.lstrip("/")
 
-        headers = {}
-        if hint is not None:
-            headers["X-Modelrunner-Runner-Hint"] = hint
+        request_headers = _build_headers(
+            headers=headers,
+            hint=hint,
+            lifecycle=lifecycle,
+            store_io=store_io,
+        )
 
         arguments = await self.transform_arguments(arguments)
 
@@ -492,7 +580,7 @@ class AsyncClient:
             url,
             json=arguments,
             timeout=timeout,
-            headers=headers,
+            headers=request_headers,
         )
         _raise_for_status(response)
 
@@ -522,6 +610,9 @@ class AsyncClient:
         webhook_events: Sequence[str] | None = None,
         priority: Optional[Priority] = None,
         metadata: Mapping[str, str] | None = None,
+        lifecycle: StorageSettings | None = None,
+        store_io: bool | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> AsyncRequestHandle:
         """Submit an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return a handle to the request that can be used to check the status
@@ -531,18 +622,29 @@ class AsyncClient:
         polling the handle. webhook_events selects which lifecycle events to be
         notified about and defaults to ["completed"]; "start" is best effort. Use
         modelrunner_ai.verify_webhook to check the signature on every delivery.
+
+        lifecycle sets how long the generated media is kept before it expires,
+        and store_io=False opts the request and response payloads out of being
+        stored at all. Both apply to this request only, overriding the
+        account-wide default -- though neither can widen a limit the account
+        already enforces.
+
+        headers is a raw escape hatch for request headers this client does not
+        model yet. The typed options above take precedence over the same header
+        passed this way.
         """
 
         url = QUEUE_URL_FORMAT + application
         if path:
             url += "/" + path.lstrip("/")
 
-        headers = {}
-        if hint is not None:
-            headers["X-Modelrunner-Runner-Hint"] = hint
-
-        if priority is not None:
-            headers["X-Modelrunner-Queue-Priority"] = priority
+        request_headers = _build_headers(
+            headers=headers,
+            hint=hint,
+            priority=priority,
+            lifecycle=lifecycle,
+            store_io=store_io,
+        )
 
         arguments = await self.transform_arguments(arguments)
 
@@ -562,7 +664,7 @@ class AsyncClient:
             # NOTE: this argument was missing, so hint and priority were built
             # and then silently dropped on the async client only. Unrelated to
             # webhooks; fixed here because this call site was being rewritten.
-            headers=headers,
+            headers=request_headers,
         )
         _raise_for_status(response)
 
@@ -589,7 +691,17 @@ class AsyncClient:
         webhook_url: str | None = None,
         webhook_events: Sequence[str] | None = None,
         metadata: Mapping[str, str] | None = None,
+        lifecycle: StorageSettings | None = None,
+        store_io: bool | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> AnyJSON:
+        """Submit an application and wait for its result, reporting progress
+        along the way.
+
+        Accepts everything submit does; see submit for lifecycle, store_io and
+        headers, which are forwarded to the enqueue request unchanged.
+        """
+
         handle = await self.submit(
             application,
             arguments,
@@ -599,6 +711,9 @@ class AsyncClient:
             webhook_url=webhook_url,
             webhook_events=webhook_events,
             metadata=metadata,
+            lifecycle=lifecycle,
+            store_io=store_io,
+            headers=headers,
         )
 
         if on_enqueue is not None:
@@ -669,17 +784,40 @@ class AsyncClient:
         path: str = "/stream",
         timeout: float | None = None,
         metadata: Mapping[str, str] | None = None,
+        lifecycle: StorageSettings | None = None,
+        store_io: bool | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream the output of an application with the given arguments (which will be JSON serialized). This is only supported
         at a few select applications at the moment, so be sure to first consult with the documentation of individual applications
         to see if this is supported.
 
         The function will iterate over each event that is streamed from the server.
+
+        lifecycle sets how long the generated media is kept before it expires,
+        and store_io=False opts the request and response payloads out of being
+        stored at all. Both apply to this request only, overriding the
+        account-wide default -- though neither can widen a limit the account
+        already enforces.
+
+        headers is a raw escape hatch for request headers this client does not
+        model yet. The typed options above take precedence over the same header
+        passed this way. Accept and Cache-Control are dropped if passed: the SSE
+        transport sets them itself, and sending a second copy would break the
+        stream rather than override them.
         """
 
         url = RUN_URL_FORMAT + application
         if path:
             url += "/" + path.lstrip("/")
+
+        request_headers = _build_headers(
+            headers=headers,
+            lifecycle=lifecycle,
+            store_io=store_io,
+        )
+        for reserved in _SSE_RESERVED_HEADERS:
+            request_headers.pop(reserved, None)
 
         arguments = await self.transform_arguments(arguments)
 
@@ -693,6 +831,7 @@ class AsyncClient:
             url,
             json=arguments,
             timeout=timeout,
+            headers=request_headers,
         ) as events:
             async for event in events.aiter_sse():
                 yield event.json()
@@ -907,6 +1046,9 @@ class SyncClient:
         timeout: float | None = None,
         hint: str | None = None,
         metadata: Mapping[str, str] | None = None,
+        lifecycle: StorageSettings | None = None,
+        store_io: bool | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> AnyJSON:
         """Run an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return the result of the inference call directly.
@@ -917,15 +1059,28 @@ class SyncClient:
 
         metadata is an optional flat map of your own string tags stored on the
         request. It is never sent to the model.
+
+        lifecycle sets how long the generated media is kept before it expires,
+        and store_io=False opts the request and response payloads out of being
+        stored at all. Both apply to this request only, overriding the
+        account-wide default -- though neither can widen a limit the account
+        already enforces.
+
+        headers is a raw escape hatch for request headers this client does not
+        model yet. The typed options above take precedence over the same header
+        passed this way.
         """
 
         url = RUN_URL_FORMAT + application
         if path:
             url += "/" + path.lstrip("/")
 
-        headers = {}
-        if hint is not None:
-            headers["X-Modelrunner-Runner-Hint"] = hint
+        request_headers = _build_headers(
+            headers=headers,
+            hint=hint,
+            lifecycle=lifecycle,
+            store_io=store_io,
+        )
 
         arguments = self.transform_arguments(arguments)
 
@@ -941,7 +1096,7 @@ class SyncClient:
             url,
             json=arguments,
             timeout=timeout,
-            headers=headers,
+            headers=request_headers,
         )
         _raise_for_status(response)
 
@@ -971,6 +1126,9 @@ class SyncClient:
         webhook_events: Sequence[str] | None = None,
         priority: Optional[Priority] = None,
         metadata: Mapping[str, str] | None = None,
+        lifecycle: StorageSettings | None = None,
+        store_io: bool | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> SyncRequestHandle:
         """Submit an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return a handle to the request that can be used to check the status
@@ -980,18 +1138,29 @@ class SyncClient:
         polling the handle. webhook_events selects which lifecycle events to be
         notified about and defaults to ["completed"]; "start" is best effort. Use
         modelrunner_ai.verify_webhook to check the signature on every delivery.
+
+        lifecycle sets how long the generated media is kept before it expires,
+        and store_io=False opts the request and response payloads out of being
+        stored at all. Both apply to this request only, overriding the
+        account-wide default -- though neither can widen a limit the account
+        already enforces.
+
+        headers is a raw escape hatch for request headers this client does not
+        model yet. The typed options above take precedence over the same header
+        passed this way.
         """
 
         url = QUEUE_URL_FORMAT + application
         if path:
             url += "/" + path.lstrip("/")
 
-        headers = {}
-        if hint is not None:
-            headers["X-Modelrunner-Runner-Hint"] = hint
-
-        if priority is not None:
-            headers["X-Modelrunner-Queue-Priority"] = priority
+        request_headers = _build_headers(
+            headers=headers,
+            hint=hint,
+            priority=priority,
+            lifecycle=lifecycle,
+            store_io=store_io,
+        )
 
         arguments = self.transform_arguments(arguments)
 
@@ -1008,7 +1177,7 @@ class SyncClient:
             url,
             json=arguments,
             timeout=self.default_timeout,
-            headers=headers,
+            headers=request_headers,
         )
         _raise_for_status(response)
 
@@ -1035,7 +1204,17 @@ class SyncClient:
         webhook_url: str | None = None,
         webhook_events: Sequence[str] | None = None,
         metadata: Mapping[str, str] | None = None,
+        lifecycle: StorageSettings | None = None,
+        store_io: bool | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> AnyJSON:
+        """Submit an application and wait for its result, reporting progress
+        along the way.
+
+        Accepts everything submit does; see submit for lifecycle, store_io and
+        headers, which are forwarded to the enqueue request unchanged.
+        """
+
         handle = self.submit(
             application,
             arguments,
@@ -1045,6 +1224,9 @@ class SyncClient:
             webhook_url=webhook_url,
             webhook_events=webhook_events,
             metadata=metadata,
+            lifecycle=lifecycle,
+            store_io=store_io,
+            headers=headers,
         )
 
         if on_enqueue is not None:
@@ -1115,17 +1297,40 @@ class SyncClient:
         path: str = "/stream",
         timeout: float | None = None,
         metadata: Mapping[str, str] | None = None,
+        lifecycle: StorageSettings | None = None,
+        store_io: bool | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Iterator[dict[str, Any]]:
         """Stream the output of an application with the given arguments (which will be JSON serialized). This is only supported
         at a few select applications at the moment, so be sure to first consult with the documentation of individual applications
         to see if this is supported.
 
         The function will iterate over each event that is streamed from the server.
+
+        lifecycle sets how long the generated media is kept before it expires,
+        and store_io=False opts the request and response payloads out of being
+        stored at all. Both apply to this request only, overriding the
+        account-wide default -- though neither can widen a limit the account
+        already enforces.
+
+        headers is a raw escape hatch for request headers this client does not
+        model yet. The typed options above take precedence over the same header
+        passed this way. Accept and Cache-Control are dropped if passed: the SSE
+        transport sets them itself, and sending a second copy would break the
+        stream rather than override them.
         """
 
         url = RUN_URL_FORMAT + application
         if path:
             url += "/" + path.lstrip("/")
+
+        request_headers = _build_headers(
+            headers=headers,
+            lifecycle=lifecycle,
+            store_io=store_io,
+        )
+        for reserved in _SSE_RESERVED_HEADERS:
+            request_headers.pop(reserved, None)
 
         arguments = self.transform_arguments(arguments)
 
@@ -1134,7 +1339,12 @@ class SyncClient:
             arguments = {**arguments, **metadata_keys}
 
         with connect_sse(
-            self._client, "POST", url, json=arguments, timeout=timeout
+            self._client,
+            "POST",
+            url,
+            json=arguments,
+            timeout=timeout,
+            headers=request_headers,
         ) as events:
             for event in events.iter_sse():
                 yield event.json()
