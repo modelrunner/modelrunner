@@ -300,8 +300,14 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.client.AsyncClient.upload">
-<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.AsyncClient.upload" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.AsyncClient.upload" title="Link to this definition">¶</a></dt>
 <dd><p>Upload the given data blob and return the access URL.</p>
+<p>lifecycle sets how long the uploaded file is kept. Unlike generated
+media, the countdown starts at upload rather than when a request
+finishes – the bytes are landing now.</p>
+<p>One thing worth knowing: an uploaded file you then pass as a request
+input stops expiring. Another request may reference the same upload, so
+the platform stops treating it as disposable.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -311,8 +317,9 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.client.AsyncClient.upload_file">
-<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.AsyncClient.upload_file" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.AsyncClient.upload_file" title="Link to this definition">¶</a></dt>
 <dd><p>Upload a file from the local filesystem to the CDN and return the access URL.</p>
+<p>See upload for what lifecycle does.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -322,8 +329,9 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.client.AsyncClient.upload_image">
-<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jpeg'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.AsyncClient.upload_image" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jpeg'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.AsyncClient.upload_image" title="Link to this definition">¶</a></dt>
 <dd><p>Upload a pillow image object to the CDN and return the access URL.</p>
+<p>See upload for what lifecycle does.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -473,6 +481,20 @@ field indicates the relative position in the queue (0-indexed).</p>
 <span class="sig-name descname"><span class="pre">position</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#modelrunner_ai.client.Queued.position" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="modelrunner_ai.client.SVG_CONTENT_TYPE">
+<span class="sig-prename descclassname"><span class="pre">modelrunner_ai.client.</span></span><span class="sig-name descname"><span class="pre">SVG_CONTENT_TYPE</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'image/svg+xml'</span></span><a class="headerlink" href="#modelrunner_ai.client.SVG_CONTENT_TYPE" title="Link to this definition">¶</a></dt>
+<dd><p>attachment`,
+so a crafted SVG cannot run as same-site script on the media domain. The
+header is part of what was signed, so the PUT has to repeat it verbatim or S3
+rejects the upload with SignatureDoesNotMatch.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The API signs an SVG’s presigned PUT with <a href="#id1"><span class="problematic" id="id2">`</span></a>Content-Disposition</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py class">
@@ -661,8 +683,14 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.client.SyncClient.upload">
-<span class="sig-name descname"><span class="pre">upload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.SyncClient.upload" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">upload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.SyncClient.upload" title="Link to this definition">¶</a></dt>
 <dd><p>Upload the given data blob and return the access URL.</p>
+<p>lifecycle sets how long the uploaded file is kept. Unlike generated
+media, the countdown starts at upload rather than when a request
+finishes – the bytes are landing now.</p>
+<p>One thing worth knowing: an uploaded file you then pass as a request
+input stops expiring. Another request may reference the same upload, so
+the platform stops treating it as disposable.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -672,8 +700,9 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.client.SyncClient.upload_file">
-<span class="sig-name descname"><span class="pre">upload_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.SyncClient.upload_file" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">upload_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.SyncClient.upload_file" title="Link to this definition">¶</a></dt>
 <dd><p>Upload a file from the local filesystem to the CDN and return the access URL.</p>
+<p>See upload for what lifecycle does.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -683,8 +712,9 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.client.SyncClient.upload_image">
-<span class="sig-name descname"><span class="pre">upload_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jpeg'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.SyncClient.upload_image" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">upload_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jpeg'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.client.SyncClient.upload_image" title="Link to this definition">¶</a></dt>
 <dd><p>Upload a pillow image object to the CDN and return the access URL.</p>
+<p>See upload for what lifecycle does.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -1241,8 +1271,14 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.AsyncClient.upload">
-<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.AsyncClient.upload" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.AsyncClient.upload" title="Link to this definition">¶</a></dt>
 <dd><p>Upload the given data blob and return the access URL.</p>
+<p>lifecycle sets how long the uploaded file is kept. Unlike generated
+media, the countdown starts at upload rather than when a request
+finishes – the bytes are landing now.</p>
+<p>One thing worth knowing: an uploaded file you then pass as a request
+input stops expiring. Another request may reference the same upload, so
+the platform stops treating it as disposable.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -1252,8 +1288,9 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.AsyncClient.upload_file">
-<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.AsyncClient.upload_file" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.AsyncClient.upload_file" title="Link to this definition">¶</a></dt>
 <dd><p>Upload a file from the local filesystem to the CDN and return the access URL.</p>
+<p>See upload for what lifecycle does.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -1263,8 +1300,9 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.AsyncClient.upload_image">
-<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jpeg'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.AsyncClient.upload_image" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">upload_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jpeg'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.AsyncClient.upload_image" title="Link to this definition">¶</a></dt>
 <dd><p>Upload a pillow image object to the CDN and return the access URL.</p>
+<p>See upload for what lifecycle does.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -1597,8 +1635,14 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.SyncClient.upload">
-<span class="sig-name descname"><span class="pre">upload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.SyncClient.upload" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">upload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.SyncClient.upload" title="Link to this definition">¶</a></dt>
 <dd><p>Upload the given data blob and return the access URL.</p>
+<p>lifecycle sets how long the uploaded file is kept. Unlike generated
+media, the countdown starts at upload rather than when a request
+finishes – the bytes are landing now.</p>
+<p>One thing worth knowing: an uploaded file you then pass as a request
+input stops expiring. Another request may reference the same upload, so
+the platform stops treating it as disposable.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -1608,8 +1652,9 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.SyncClient.upload_file">
-<span class="sig-name descname"><span class="pre">upload_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.SyncClient.upload_file" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">upload_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.SyncClient.upload_file" title="Link to this definition">¶</a></dt>
 <dd><p>Upload a file from the local filesystem to the CDN and return the access URL.</p>
+<p>See upload for what lifecycle does.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
@@ -1619,8 +1664,9 @@ headers, which are forwarded to the enqueue request unchanged.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="modelrunner_ai.SyncClient.upload_image">
-<span class="sig-name descname"><span class="pre">upload_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jpeg'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.SyncClient.upload_image" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">upload_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jpeg'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lifecycle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#modelrunner_ai.SyncClient.upload_image" title="Link to this definition">¶</a></dt>
 <dd><p>Upload a pillow image object to the CDN and return the access URL.</p>
+<p>See upload for what lifecycle does.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span></p>
