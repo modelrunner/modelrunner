@@ -5,9 +5,9 @@ Both travel as request *headers* rather than as reserved body keys, so unlike
 metadata and webhooks they never touch the arguments and cannot collide with a
 model's input schema.
 
-The per-request value overrides the account-wide default set in the dashboard.
-It does not widen it: an account restricted to a shorter retention stays
-restricted, so treat a longer ``expires_in`` here as a request, not a promise.
+The per-request value always wins over the account-wide default set in the
+dashboard, in both directions -- including ``expires_in="never"``, which is how
+a single request is exempted from an account-wide media expiration.
 """
 
 from __future__ import annotations
@@ -31,11 +31,21 @@ STORE_IO_HEADER = "x-modelrunner-store-io"
 NamedExpiration = Literal["never", "1h", "1d", "7d", "30d", "1y"]
 ObjectExpiration = Union[NamedExpiration, int]
 
-#: The named windows, in seconds. ``never`` is a hundred years rather than a
-#: sentinel because the API takes a duration and has no "keep forever" value;
-#: this matches what the JS client sends.
-EXPIRATION_VALUES: Dict[str, int] = {
-    "never": 3153600000,  # 100 years
+#: Bounds the API enforces on ``expiration_duration_seconds``. Mirrored here so
+#: a violation fails locally, with the offending value named, instead of costing
+#: a round trip and coming back as a 400.
+EXPIRATION_MIN_SECONDS = 60
+EXPIRATION_MAX_SECONDS = 157680000  # 5 years
+
+#: The named windows, in seconds. ``never`` is ``None`` -- it serializes to a
+#: JSON null, which is the API's "no expiration", and is also how a single
+#: request opts out of an account-wide media expiration.
+#:
+#: NOTE: the JS client instead sends 3153600000 (100 years) for "never". That is
+#: roughly twenty times EXPIRATION_MAX_SECONDS, so it is rejected rather than
+#: treated as forever; see modelrunner/modelrunner-js#8.
+EXPIRATION_VALUES: Dict[str, Optional[int]] = {
+    "never": None,
     "1h": 3600,
     "1d": 86400,
     "7d": 604800,
@@ -48,18 +58,26 @@ EXPIRATION_VALUES: Dict[str, int] = {
 class StorageSettings:
     """How long generated objects stay available before they expire.
 
+    The countdown starts when the request **finishes**, not when it is
+    submitted, so a short window still gives you that long after the output
+    exists.
+
     :param expires_in: one of ``"never"``, ``"1h"``, ``"1d"``, ``"7d"``,
-        ``"30d"``, ``"1y"``, or a number of seconds.
+        ``"30d"``, ``"1y"``, or a number of seconds between
+        ``EXPIRATION_MIN_SECONDS`` and ``EXPIRATION_MAX_SECONDS``.
     """
 
     expires_in: ObjectExpiration
 
 
-def expiration_duration_seconds(lifecycle: StorageSettings) -> int:
+def expiration_duration_seconds(lifecycle: StorageSettings) -> Optional[int]:
     """Resolve a :class:`StorageSettings` to a duration in seconds.
 
-    :raises ValueError: if ``expires_in`` is not a known window or a positive
-        number of seconds.
+    Returns ``None`` for ``"never"``, which is the API's "no expiration" and
+    serializes to a JSON null rather than to a very large number.
+
+    :raises ValueError: if ``expires_in`` is not a known window or a duration
+        the API accepts.
     """
 
     if not isinstance(lifecycle, StorageSettings):
@@ -75,9 +93,11 @@ def expiration_duration_seconds(lifecycle: StorageSettings) -> int:
         raise ValueError("expires_in must be a duration or a named window, not a bool")
 
     if isinstance(expires_in, int):
-        if expires_in <= 0:
+        if not (EXPIRATION_MIN_SECONDS <= expires_in <= EXPIRATION_MAX_SECONDS):
             raise ValueError(
-                f"expires_in must be a positive number of seconds (got {expires_in})"
+                f"expires_in must be between {EXPIRATION_MIN_SECONDS} and "
+                f"{EXPIRATION_MAX_SECONDS} seconds (got {expires_in}); pass "
+                f'"never" for no expiration'
             )
         return expires_in
 
@@ -91,7 +111,8 @@ def expiration_duration_seconds(lifecycle: StorageSettings) -> int:
             raise ValueError(
                 "expires_in does not support 'immediate'; the API takes a "
                 "duration, and there is no wire value that expires an object "
-                "on arrival. Pass a short duration in seconds instead."
+                f"on arrival. The shortest it accepts is "
+                f"{EXPIRATION_MIN_SECONDS} seconds."
             )
         if expires_in not in EXPIRATION_VALUES:
             raise ValueError(

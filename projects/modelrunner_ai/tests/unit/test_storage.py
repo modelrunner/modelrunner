@@ -3,6 +3,8 @@ import json
 import pytest
 
 from modelrunner_ai.storage import (
+    EXPIRATION_MAX_SECONDS,
+    EXPIRATION_MIN_SECONDS,
     OBJECT_LIFECYCLE_PREFERENCE_HEADER,
     STORE_IO_HEADER,
     StorageSettings,
@@ -20,13 +22,20 @@ from modelrunner_ai.storage import (
         ("7d", 604800),
         ("30d", 2592000),
         ("1y", 31536000),
-        ("never", 3153600000),
         (3600, 3600),
-        (1, 1),
+        (EXPIRATION_MIN_SECONDS, EXPIRATION_MIN_SECONDS),
+        (EXPIRATION_MAX_SECONDS, EXPIRATION_MAX_SECONDS),
     ],
 )
 def test_expiration_resolves_to_seconds(expires_in, seconds):
     assert expiration_duration_seconds(StorageSettings(expires_in)) == seconds
+
+
+def test_never_resolves_to_no_expiration():
+    """The API spells "no expiration" as a null, not as a very large duration --
+    a hundred years is ~20x the maximum it accepts and would be rejected."""
+
+    assert expiration_duration_seconds(StorageSettings("never")) is None
 
 
 @pytest.mark.parametrize(
@@ -34,6 +43,11 @@ def test_expiration_resolves_to_seconds(expires_in, seconds):
     [
         0,
         -1,
+        # Outside the range the API accepts, so it is caught locally rather than
+        # coming back as a 400.
+        EXPIRATION_MIN_SECONDS - 1,
+        EXPIRATION_MAX_SECONDS + 1,
+        3153600000,  # what the JS client sends for "never"
         # bool is an int subclass; `expires_in=True` is never meant as 1 second.
         True,
         False,
@@ -74,6 +88,17 @@ def test_lifecycle_header_uses_the_documented_wire_shape():
 
 def test_lifecycle_header_is_omitted_without_a_preference():
     assert object_lifecycle_headers(None) == {}
+
+
+def test_never_sends_an_explicit_null_rather_than_omitting_the_header():
+    """Never is not the same as sending nothing: the null is what exempts a
+    request from an account-wide media expiration, so the header has to go."""
+
+    headers = object_lifecycle_headers(StorageSettings("never"))
+
+    assert headers[OBJECT_LIFECYCLE_PREFERENCE_HEADER] == (
+        '{"expiration_duration_seconds":null}'
+    )
 
 
 @pytest.mark.parametrize("store_io, value", [(False, "0"), (True, "1")])

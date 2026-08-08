@@ -46,7 +46,7 @@ Priority = Literal["normal", "low"]
 RUN_URL_FORMAT = f"https://{MODELRUNNER_RUN_HOST}/"
 QUEUE_URL_FORMAT = f"https://queue.{MODELRUNNER_RUN_HOST}/"
 REST_URL = "https://modelrunner.run"
-USER_AGENT = "modelrunner-ai/0.5.0 (python)"
+USER_AGENT = "modelrunner-ai/0.5.1 (python)"
 WEBHOOK_SECRET_URL = f"{REST_URL}/webhooks/default/secret"
 
 
