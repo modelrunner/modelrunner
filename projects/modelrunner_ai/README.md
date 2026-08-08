@@ -44,6 +44,26 @@ async def main():
 asyncio.run(main())
 ```
 
+## Running a model
+
+`run` is the one-liner version: it submits the request, waits for the inference to finish and hands back the result.
+
+```python
+import modelrunner_ai
+
+result = modelrunner_ai.run(
+    "bytedance/sdxl-lightning-4step",
+    arguments={"prompt": "two friends cooking together"},
+)
+print(result["output"])
+```
+
+It blocks for as long as the model takes, so reach for `submit` (above) or a webhook when that is minutes rather than seconds. `timeout` bounds the enqueue request only, not the wait.
+
+`result` is the same record `submit` + `handle.get()` returns, so the failure rule is the same one the webhook section spells out below: a failed generation still reads `status: "COMPLETED"`, with the detail in `error` and nothing useful in `output`.
+
+> **Changed in 0.4.0.** `run` used to return the queue envelope — `{"status": "IN_PROGRESS", "request_id": ..., ...}` — the instant the request was accepted, so the `result["output"]` its own docstring promised raised `KeyError`. It now waits, as documented. Code that worked around this by taking that envelope and polling its urls by hand breaks: there is no envelope to read any more. Use `submit` + `handle.get()`, which is unchanged, or drop the workaround and let `run` do the waiting.
+
 ## Uploading files
 
 If the model requires files as input, you can upload them directly to media.modelrunner.ai (our CDN) and pass the URLs to the client. Here's an example:

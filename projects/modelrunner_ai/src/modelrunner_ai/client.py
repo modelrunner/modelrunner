@@ -41,7 +41,7 @@ Priority = Literal["normal", "low"]
 RUN_URL_FORMAT = f"https://{MODELRUNNER_RUN_HOST}/"
 QUEUE_URL_FORMAT = f"https://queue.{MODELRUNNER_RUN_HOST}/"
 REST_URL = "https://modelrunner.run"
-USER_AGENT = "modelrunner-ai/0.3.0 (python)"
+USER_AGENT = "modelrunner-ai/0.4.0 (python)"
 WEBHOOK_SECRET_URL = f"{REST_URL}/webhooks/default/secret"
 
 
@@ -145,6 +145,18 @@ class _BaseRequestHandle:
             return Completed(logs=data["logs"], metrics=metrics)
         else:
             raise ValueError(f"Unknown status: {data['status']}")
+
+
+# The run endpoint answers with the queue envelope -- the request id and the urls
+# to poll -- and not with the result, so `run` has to follow it to a terminal
+# state itself. Kept as a shape check rather than a status check because a fast
+# request can already read COMPLETED here while the output is still only
+# reachable through response_url.
+_QUEUE_ENVELOPE_KEYS = ("request_id", "response_url", "status_url")
+
+
+def _is_queue_envelope(data: Any) -> bool:
+    return isinstance(data, dict) and all(key in data for key in _QUEUE_ENVELOPE_KEYS)
 
 
 APP_NAMESPACES = ["workflows", "comfy"]
@@ -450,6 +462,10 @@ class AsyncClient:
         """Run an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return the result of the inference call directly.
 
+        It waits for the inference to finish, however long that takes -- use
+        submit instead if you need to do something else in the meantime. timeout
+        bounds the enqueue request only, not the wait.
+
         metadata is an optional flat map of your own string tags stored on the
         request. It is never sent to the model.
         """
@@ -479,7 +495,21 @@ class AsyncClient:
             headers=headers,
         )
         _raise_for_status(response)
-        return response.json()
+
+        data = response.json()
+        # NOTE: this used to return the envelope as-is, so the documented
+        # result["output"] raised KeyError on every call.
+        if not _is_queue_envelope(data):
+            return data
+
+        handle = AsyncRequestHandle(
+            request_id=data["request_id"],
+            response_url=data["response_url"],
+            status_url=data["status_url"],
+            cancel_url=data.get("cancel_url", ""),
+            client=self._client,
+        )
+        return await handle.get()
 
     async def submit(
         self,
@@ -881,6 +911,10 @@ class SyncClient:
         """Run an application with the given arguments (which will be JSON serialized). The path parameter can be used to
         specify a subpath when applicable. This method will return the result of the inference call directly.
 
+        It waits for the inference to finish, however long that takes -- use
+        submit instead if you need to do something else in the meantime. timeout
+        bounds the enqueue request only, not the wait.
+
         metadata is an optional flat map of your own string tags stored on the
         request. It is never sent to the model.
         """
@@ -910,7 +944,21 @@ class SyncClient:
             headers=headers,
         )
         _raise_for_status(response)
-        return response.json()
+
+        data = response.json()
+        # NOTE: this used to return the envelope as-is, so the documented
+        # result["output"] raised KeyError on every call.
+        if not _is_queue_envelope(data):
+            return data
+
+        handle = SyncRequestHandle(
+            request_id=data["request_id"],
+            response_url=data["response_url"],
+            status_url=data["status_url"],
+            cancel_url=data.get("cancel_url", ""),
+            client=self._client,
+        )
+        return handle.get()
 
     def submit(
         self,
