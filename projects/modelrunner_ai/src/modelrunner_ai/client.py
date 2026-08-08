@@ -22,8 +22,6 @@ from typing import (
     Sequence,
     TYPE_CHECKING,
 )
-from urllib.parse import urlparse
-
 import httpx
 from httpx_sse import aconnect_sse, connect_sse
 from modelrunner_ai.auth import MODELRUNNER_RUN_HOST, fetch_credentials
@@ -46,9 +44,15 @@ Priority = Literal["normal", "low"]
 RUN_URL_FORMAT = f"https://{MODELRUNNER_RUN_HOST}/"
 QUEUE_URL_FORMAT = f"https://queue.{MODELRUNNER_RUN_HOST}/"
 REST_URL = "https://modelrunner.run"
-USER_AGENT = "modelrunner-ai/0.5.1 (python)"
+USER_AGENT = "modelrunner-ai/0.6.0 (python)"
 WEBHOOK_SECRET_URL = f"{REST_URL}/webhooks/default/secret"
 
+
+#: The API signs an SVG's presigned PUT with `Content-Disposition: attachment`,
+#: so a crafted SVG cannot run as same-site script on the media domain. The
+#: header is part of what was signed, so the PUT has to repeat it verbatim or S3
+#: rejects the upload with SignatureDoesNotMatch.
+SVG_CONTENT_TYPE = "image/svg+xml"
 
 MULTIPART_THRESHOLD = 90 * 1024 * 1024
 MULTIPART_CHUNK_SIZE = 10 * 1024 * 1024
@@ -128,6 +132,13 @@ def _extension_from_content_type(content_type: str) -> str:
         return file_type.split("-")[0].split(";")[0] or "bin"
     except Exception:
         return "bin"
+
+
+def _singlepart_put_headers(content_type: str) -> Dict[str, str]:
+    headers = {"Content-Type": content_type}
+    if content_type == SVG_CONTENT_TYPE:
+        headers["Content-Disposition"] = "attachment"
+    return headers
 
 
 def _default_filename(content_type: str) -> str:
@@ -837,9 +848,22 @@ class AsyncClient:
                 yield event.json()
 
     async def upload(
-        self, data: str | bytes, content_type: str, file_name: str | None = None
+        self,
+        data: str | bytes,
+        content_type: str,
+        file_name: str | None = None,
+        lifecycle: StorageSettings | None = None,
     ) -> str:
-        """Upload the given data blob and return the access URL."""
+        """Upload the given data blob and return the access URL.
+
+        lifecycle sets how long the uploaded file is kept. Unlike generated
+        media, the countdown starts at upload rather than when a request
+        finishes -- the bytes are landing now.
+
+        One thing worth knowing: an uploaded file you then pass as a request
+        input stops expiring. Another request may reference the same upload, so
+        the platform stops treating it as disposable.
+        """
 
         if isinstance(data, str):
             data = data.encode("utf-8")
@@ -849,29 +873,45 @@ class AsyncClient:
                 data=data,
                 content_type=content_type,
                 file_name=file_name or _default_filename(content_type),
+                lifecycle=lifecycle,
             )
 
         return await self._singlepart_upload_pre_signed(
             data=data,
             content_type=content_type,
             file_name=file_name or _default_filename(content_type),
+            lifecycle=lifecycle,
         )
 
     async def _initiate_upload(
-        self, file_name: str, content_type: str
+        self,
+        file_name: str,
+        content_type: str,
+        lifecycle: StorageSettings | None = None,
     ) -> tuple[str, str]:
+        # A single-part upload's row is created at initiate, so the expiry rides
+        # on this call. The countdown starts now rather than at finalization --
+        # the bytes are landing immediately.
         resp = await _async_maybe_retry_request(
             self._client,
             "POST",
             f"{REST_URL}/storage/upload/initiate",
             json={"content_type": content_type, "file_name": file_name},
+            headers=object_lifecycle_headers(lifecycle),
         )
         data = resp.json()
         return data["upload_url"], data["file_url"]
 
     async def _initiate_multipart_upload(
         self, file_name: str, content_type: str
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, str]:
+        """Start a multipart upload. Returns (upload_id, upload_key, file_url).
+
+        Deliberately sends no lifecycle header: a multipart upload's row is
+        created when it COMPLETES, so the preference has to ride on that call
+        instead. See _complete_multipart_upload.
+        """
+
         resp = await _async_maybe_retry_request(
             self._client,
             "POST",
@@ -879,40 +919,84 @@ class AsyncClient:
             json={"content_type": content_type, "file_name": file_name},
         )
         data = resp.json()
-        return data["upload_url"], data["file_url"]
+        return data["uploadId"], data["uploadKey"], data["fileUrl"]
+
+    async def _multipart_part_url(
+        self, upload_key: str, upload_id: str, part_number: int
+    ) -> str:
+        resp = await _async_maybe_retry_request(
+            self._client,
+            "GET",
+            f"{REST_URL}/storage/upload/multipart-url",
+            params={
+                "uploadKey": upload_key,
+                "uploadId": upload_id,
+                "partNumber": part_number,
+            },
+        )
+        return resp.json()["presignedUrl"]
+
+    async def _complete_multipart_upload(
+        self,
+        upload_id: str,
+        upload_key: str,
+        parts: list[dict[str, object]],
+        lifecycle_headers: Dict[str, str],
+    ) -> None:
+        await _async_maybe_retry_request(
+            self._client,
+            "POST",
+            f"{REST_URL}/storage/upload/complete",
+            json={"uploadId": upload_id, "uploadKey": upload_key, "parts": parts},
+            headers=lifecycle_headers,
+        )
 
     async def _singlepart_upload_pre_signed(
-        self, data: bytes, content_type: str, file_name: str
+        self,
+        data: bytes,
+        content_type: str,
+        file_name: str,
+        lifecycle: StorageSettings | None = None,
     ) -> str:
-        upload_url, file_url = await self._initiate_upload(file_name, content_type)
+        upload_url, file_url = await self._initiate_upload(
+            file_name, content_type, lifecycle
+        )
         async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as c:
             resp = await c.put(
-                upload_url, content=data, headers={"Content-Type": content_type}
+                upload_url, content=data, headers=_singlepart_put_headers(content_type)
             )
             _raise_for_status(resp)
         return file_url
 
     async def _multipart_upload_pre_signed(
-        self, data: bytes, content_type: str, file_name: str
+        self,
+        data: bytes,
+        content_type: str,
+        file_name: str,
+        lifecycle: StorageSettings | None = None,
     ) -> str:
-        upload_url, file_url = await self._initiate_multipart_upload(
+        # Built before the first part goes out: the header only rides on the
+        # complete call, and validating it there would mean rejecting an invalid
+        # lifecycle only after transferring the entire payload.
+        lifecycle_headers = object_lifecycle_headers(lifecycle)
+
+        upload_id, upload_key, file_url = await self._initiate_multipart_upload(
             file_name, content_type
         )
-
-        parsed = urlparse(upload_url)
-        origin = f"{parsed.scheme}://{parsed.netloc}"
-        base_path = parsed.path
-        query = f"?{parsed.query}" if parsed.query else ""
 
         parts = math.ceil(len(data) / MULTIPART_CHUNK_SIZE)
         part_results: list[dict[str, object]] = []
 
+        # Parts go straight to S3 on a presigned URL, so they are uploaded with a
+        # bare client -- our Authorization header has no meaning there and would
+        # collide with the signature carried in the query string.
         async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as c:
-            for i in range(parts):
-                start = i * MULTIPART_CHUNK_SIZE
+            for part_number in range(1, parts + 1):
+                start = (part_number - 1) * MULTIPART_CHUNK_SIZE
                 chunk = data[start : start + MULTIPART_CHUNK_SIZE]
-                part_number = i + 1
-                part_url = f"{origin}{base_path}/{part_number}{query}"
+                part_url = await self._multipart_part_url(
+                    upload_key, upload_id, part_number
+                )
 
                 resp = await c.put(part_url, content=chunk, timeout=None)
                 _raise_for_status(resp)
@@ -924,10 +1008,14 @@ class AsyncClient:
 
                 part_results.append({"partNumber": part_number, "etag": etag})
 
-            complete_url = f"{origin}{base_path}/complete{query}"
-            resp = await c.post(complete_url, json={"parts": part_results})
-            _raise_for_status(resp)
+        await self._complete_multipart_upload(
+            upload_id, upload_key, part_results, lifecycle_headers
+        )
 
+        # Deliberately the url initiate handed back, not the one complete
+        # answers with: the API keys the file row by the former, while the
+        # latter is the bucket-native S3 location -- two different strings for
+        # the same object, and only one of them is the one the platform knows.
         return file_url
 
     async def transform_arguments(self, input: Any) -> Any:
@@ -948,8 +1036,13 @@ class AsyncClient:
             pass
         return input
 
-    async def upload_file(self, path: os.PathLike) -> str:
-        """Upload a file from the local filesystem to the CDN and return the access URL."""
+    async def upload_file(
+        self, path: os.PathLike, lifecycle: StorageSettings | None = None
+    ) -> str:
+        """Upload a file from the local filesystem to the CDN and return the access URL.
+
+        See upload for what lifecycle does.
+        """
 
         mime_type, _ = mimetypes.guess_type(path)
         if mime_type is None:
@@ -959,32 +1052,49 @@ class AsyncClient:
             return await self._multipart_upload_file_pre_signed(
                 file_path=path,
                 content_type=mime_type,
+                lifecycle=lifecycle,
             )
 
         with open(path, "rb") as file:
             return await self.upload(
-                file.read(), mime_type, file_name=os.path.basename(path)
+                file.read(),
+                mime_type,
+                file_name=os.path.basename(path),
+                lifecycle=lifecycle,
             )
 
-    async def upload_image(self, image: Image.Image, format: str = "jpeg") -> str:
-        """Upload a pillow image object to the CDN and return the access URL."""
+    async def upload_image(
+        self,
+        image: Image.Image,
+        format: str = "jpeg",
+        lifecycle: StorageSettings | None = None,
+    ) -> str:
+        """Upload a pillow image object to the CDN and return the access URL.
+
+        See upload for what lifecycle does.
+        """
 
         with io.BytesIO() as buffer:
             image.save(buffer, format=format)
-            return await self.upload(buffer.getvalue(), f"image/{format}")
+            return await self.upload(
+                buffer.getvalue(), f"image/{format}", lifecycle=lifecycle
+            )
 
     async def _multipart_upload_file_pre_signed(
-        self, file_path: os.PathLike, content_type: str
+        self,
+        file_path: os.PathLike,
+        content_type: str,
+        lifecycle: StorageSettings | None = None,
     ) -> str:
         file_name = os.path.basename(file_path)
-        upload_url, file_url = await self._initiate_multipart_upload(
+        # Built before the first part goes out: the header only rides on the
+        # complete call, and validating it there would mean rejecting an invalid
+        # lifecycle only after transferring the entire payload.
+        lifecycle_headers = object_lifecycle_headers(lifecycle)
+
+        upload_id, upload_key, file_url = await self._initiate_multipart_upload(
             file_name, content_type
         )
-
-        parsed = urlparse(upload_url)
-        origin = f"{parsed.scheme}://{parsed.netloc}"
-        base_path = parsed.path
-        query = f"?{parsed.query}" if parsed.query else ""
 
         size = os.path.getsize(file_path)
         parts = math.ceil(size / MULTIPART_CHUNK_SIZE)
@@ -997,7 +1107,9 @@ class AsyncClient:
                     f.seek(start)
                     chunk = f.read(MULTIPART_CHUNK_SIZE)
 
-                part_url = f"{origin}{base_path}/{part_number}{query}"
+                part_url = await self._multipart_part_url(
+                    upload_key, upload_id, part_number
+                )
                 resp = await c.put(part_url, content=chunk, timeout=None)
                 _raise_for_status(resp)
                 etag = resp.headers.get("ETag") or resp.headers.get("etag")
@@ -1008,9 +1120,9 @@ class AsyncClient:
 
                 part_results.append({"partNumber": part_number, "etag": etag})
 
-            complete_url = f"{origin}{base_path}/complete{query}"
-            resp = await c.post(complete_url, json={"parts": part_results})
-            _raise_for_status(resp)
+        await self._complete_multipart_upload(
+            upload_id, upload_key, part_results, lifecycle_headers
+        )
 
         return file_url
 
@@ -1350,9 +1462,22 @@ class SyncClient:
                 yield event.json()
 
     def upload(
-        self, data: str | bytes, content_type: str, file_name: str | None = None
+        self,
+        data: str | bytes,
+        content_type: str,
+        file_name: str | None = None,
+        lifecycle: StorageSettings | None = None,
     ) -> str:
-        """Upload the given data blob and return the access URL."""
+        """Upload the given data blob and return the access URL.
+
+        lifecycle sets how long the uploaded file is kept. Unlike generated
+        media, the countdown starts at upload rather than when a request
+        finishes -- the bytes are landing now.
+
+        One thing worth knowing: an uploaded file you then pass as a request
+        input stops expiring. Another request may reference the same upload, so
+        the platform stops treating it as disposable.
+        """
 
         if isinstance(data, str):
             data = data.encode("utf-8")
@@ -1362,27 +1487,45 @@ class SyncClient:
                 data=data,
                 content_type=content_type,
                 file_name=file_name or _default_filename(content_type),
+                lifecycle=lifecycle,
             )
 
         return self._singlepart_upload_pre_signed(
             data=data,
             content_type=content_type,
             file_name=file_name or _default_filename(content_type),
+            lifecycle=lifecycle,
         )
 
-    def _initiate_upload(self, file_name: str, content_type: str) -> tuple[str, str]:
+    def _initiate_upload(
+        self,
+        file_name: str,
+        content_type: str,
+        lifecycle: StorageSettings | None = None,
+    ) -> tuple[str, str]:
+        # A single-part upload's row is created at initiate, so the expiry rides
+        # on this call. The countdown starts now rather than at finalization --
+        # the bytes are landing immediately.
         resp = _maybe_retry_request(
             self._client,
             "POST",
             f"{REST_URL}/storage/upload/initiate",
             json={"content_type": content_type, "file_name": file_name},
+            headers=object_lifecycle_headers(lifecycle),
         )
         data = resp.json()
         return data["upload_url"], data["file_url"]
 
     def _initiate_multipart_upload(
         self, file_name: str, content_type: str
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, str]:
+        """Start a multipart upload. Returns (upload_id, upload_key, file_url).
+
+        Deliberately sends no lifecycle header: a multipart upload's row is
+        created when it COMPLETES, so the preference has to ride on that call
+        instead. See _complete_multipart_upload.
+        """
+
         resp = _maybe_retry_request(
             self._client,
             "POST",
@@ -1390,38 +1533,80 @@ class SyncClient:
             json={"content_type": content_type, "file_name": file_name},
         )
         data = resp.json()
-        return data["upload_url"], data["file_url"]
+        return data["uploadId"], data["uploadKey"], data["fileUrl"]
+
+    def _multipart_part_url(
+        self, upload_key: str, upload_id: str, part_number: int
+    ) -> str:
+        resp = _maybe_retry_request(
+            self._client,
+            "GET",
+            f"{REST_URL}/storage/upload/multipart-url",
+            params={
+                "uploadKey": upload_key,
+                "uploadId": upload_id,
+                "partNumber": part_number,
+            },
+        )
+        return resp.json()["presignedUrl"]
+
+    def _complete_multipart_upload(
+        self,
+        upload_id: str,
+        upload_key: str,
+        parts: list[dict[str, object]],
+        lifecycle_headers: Dict[str, str],
+    ) -> None:
+        _maybe_retry_request(
+            self._client,
+            "POST",
+            f"{REST_URL}/storage/upload/complete",
+            json={"uploadId": upload_id, "uploadKey": upload_key, "parts": parts},
+            headers=lifecycle_headers,
+        )
 
     def _singlepart_upload_pre_signed(
-        self, data: bytes, content_type: str, file_name: str
+        self,
+        data: bytes,
+        content_type: str,
+        file_name: str,
+        lifecycle: StorageSettings | None = None,
     ) -> str:
-        upload_url, file_url = self._initiate_upload(file_name, content_type)
+        upload_url, file_url = self._initiate_upload(file_name, content_type, lifecycle)
         with httpx.Client(headers={"User-Agent": USER_AGENT}) as c:
             resp = c.put(
-                upload_url, content=data, headers={"Content-Type": content_type}
+                upload_url, content=data, headers=_singlepart_put_headers(content_type)
             )
             _raise_for_status(resp)
         return file_url
 
     def _multipart_upload_pre_signed(
-        self, data: bytes, content_type: str, file_name: str
+        self,
+        data: bytes,
+        content_type: str,
+        file_name: str,
+        lifecycle: StorageSettings | None = None,
     ) -> str:
-        upload_url, file_url = self._initiate_multipart_upload(file_name, content_type)
+        # Built before the first part goes out: the header only rides on the
+        # complete call, and validating it there would mean rejecting an invalid
+        # lifecycle only after transferring the entire payload.
+        lifecycle_headers = object_lifecycle_headers(lifecycle)
 
-        parsed = urlparse(upload_url)
-        origin = f"{parsed.scheme}://{parsed.netloc}"
-        base_path = parsed.path
-        query = f"?{parsed.query}" if parsed.query else ""
+        upload_id, upload_key, file_url = self._initiate_multipart_upload(
+            file_name, content_type
+        )
 
         parts = math.ceil(len(data) / MULTIPART_CHUNK_SIZE)
         part_results: list[dict[str, object]] = []
 
+        # Parts go straight to S3 on a presigned URL, so they are uploaded with a
+        # bare client -- our Authorization header has no meaning there and would
+        # collide with the signature carried in the query string.
         with httpx.Client(headers={"User-Agent": USER_AGENT}) as c:
-            for i in range(parts):
-                start = i * MULTIPART_CHUNK_SIZE
+            for part_number in range(1, parts + 1):
+                start = (part_number - 1) * MULTIPART_CHUNK_SIZE
                 chunk = data[start : start + MULTIPART_CHUNK_SIZE]
-                part_number = i + 1
-                part_url = f"{origin}{base_path}/{part_number}{query}"
+                part_url = self._multipart_part_url(upload_key, upload_id, part_number)
 
                 resp = c.put(part_url, content=chunk, timeout=None)
                 _raise_for_status(resp)
@@ -1433,10 +1618,14 @@ class SyncClient:
 
                 part_results.append({"partNumber": part_number, "etag": etag})
 
-            complete_url = f"{origin}{base_path}/complete{query}"
-            resp = c.post(complete_url, json={"parts": part_results})
-            _raise_for_status(resp)
+        self._complete_multipart_upload(
+            upload_id, upload_key, part_results, lifecycle_headers
+        )
 
+        # Deliberately the url initiate handed back, not the one complete
+        # answers with: the API keys the file row by the former, while the
+        # latter is the bucket-native S3 location -- two different strings for
+        # the same object, and only one of them is the one the platform knows.
         return file_url
 
     def transform_arguments(self, input: Any) -> Any:
@@ -1457,8 +1646,13 @@ class SyncClient:
             pass
         return input
 
-    def upload_file(self, path: os.PathLike) -> str:
-        """Upload a file from the local filesystem to the CDN and return the access URL."""
+    def upload_file(
+        self, path: os.PathLike, lifecycle: StorageSettings | None = None
+    ) -> str:
+        """Upload a file from the local filesystem to the CDN and return the access URL.
+
+        See upload for what lifecycle does.
+        """
 
         mime_type, _ = mimetypes.guess_type(path)
         if mime_type is None:
@@ -1468,28 +1662,49 @@ class SyncClient:
             return self._multipart_upload_file_pre_signed(
                 file_path=path,
                 content_type=mime_type,
+                lifecycle=lifecycle,
             )
 
         with open(path, "rb") as file:
-            return self.upload(file.read(), mime_type, file_name=os.path.basename(path))
+            return self.upload(
+                file.read(),
+                mime_type,
+                file_name=os.path.basename(path),
+                lifecycle=lifecycle,
+            )
 
-    def upload_image(self, image: Image.Image, format: str = "jpeg") -> str:
-        """Upload a pillow image object to the CDN and return the access URL."""
+    def upload_image(
+        self,
+        image: Image.Image,
+        format: str = "jpeg",
+        lifecycle: StorageSettings | None = None,
+    ) -> str:
+        """Upload a pillow image object to the CDN and return the access URL.
+
+        See upload for what lifecycle does.
+        """
 
         with io.BytesIO() as buffer:
             image.save(buffer, format=format)
-            return self.upload(buffer.getvalue(), f"image/{format}")
+            return self.upload(
+                buffer.getvalue(), f"image/{format}", lifecycle=lifecycle
+            )
 
     def _multipart_upload_file_pre_signed(
-        self, file_path: os.PathLike, content_type: str
+        self,
+        file_path: os.PathLike,
+        content_type: str,
+        lifecycle: StorageSettings | None = None,
     ) -> str:
         file_name = os.path.basename(file_path)
-        upload_url, file_url = self._initiate_multipart_upload(file_name, content_type)
+        # Built before the first part goes out: the header only rides on the
+        # complete call, and validating it there would mean rejecting an invalid
+        # lifecycle only after transferring the entire payload.
+        lifecycle_headers = object_lifecycle_headers(lifecycle)
 
-        parsed = urlparse(upload_url)
-        origin = f"{parsed.scheme}://{parsed.netloc}"
-        base_path = parsed.path
-        query = f"?{parsed.query}" if parsed.query else ""
+        upload_id, upload_key, file_url = self._initiate_multipart_upload(
+            file_name, content_type
+        )
 
         size = os.path.getsize(file_path)
         parts = math.ceil(size / MULTIPART_CHUNK_SIZE)
@@ -1502,7 +1717,7 @@ class SyncClient:
                     f.seek(start)
                     chunk = f.read(MULTIPART_CHUNK_SIZE)
 
-                part_url = f"{origin}{base_path}/{part_number}{query}"
+                part_url = self._multipart_part_url(upload_key, upload_id, part_number)
                 resp = c.put(part_url, content=chunk, timeout=None)
                 _raise_for_status(resp)
                 etag = resp.headers.get("ETag") or resp.headers.get("etag")
@@ -1513,9 +1728,9 @@ class SyncClient:
 
                 part_results.append({"partNumber": part_number, "etag": etag})
 
-            complete_url = f"{origin}{base_path}/complete{query}"
-            resp = c.post(complete_url, json={"parts": part_results})
-            _raise_for_status(resp)
+        self._complete_multipart_upload(
+            upload_id, upload_key, part_results, lifecycle_headers
+        )
 
         return file_url
 
