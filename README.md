@@ -10,6 +10,10 @@ To install the client, run:
 pip install modelrunner-ai
 ```
 
+> **Maintaining an open-source project?** ModelRunner gives active open-source
+> projects free monthly API credits — apply at
+> [modelrunner.ai/oss-program](https://modelrunner.ai/oss-program).
+
 To use the client, you need to have an API key. You can get one by signing up at [modelrunner.ai](https://modelrunner.ai). Once you have it, set
 it as an environment variable:
 
