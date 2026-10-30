@@ -12,6 +12,14 @@ modelrunner\_ai.auth module
    :show-inheritance:
    :undoc-members:
 
+modelrunner\_ai.character\_references module
+--------------------------------------------
+
+.. automodule:: modelrunner_ai.character_references
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 modelrunner\_ai.client module
 -----------------------------
 
