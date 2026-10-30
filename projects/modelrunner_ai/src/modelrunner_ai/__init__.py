@@ -1,3 +1,4 @@
+from modelrunner_ai.character_references import CharacterReferenceBinding
 from modelrunner_ai.client import (
     AsyncClient,
     SyncClient,
@@ -28,6 +29,7 @@ from modelrunner_ai.webhooks import (
 )
 
 __all__ = [
+    "CharacterReferenceBinding",
     "SyncClient",
     "AsyncClient",
     "Status",

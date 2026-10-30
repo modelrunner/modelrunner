@@ -189,3 +189,7 @@ secret = modelrunner_ai.rotate_webhook_secret()
 Both the old and the new secret are signed with for **24 hours** afterwards, so you have that long to deploy the new value. `verify_webhook` accepts a list of secrets to bridge the gap. Rotating twice inside that window ends it early and breaks receivers still holding the original secret, so this call is never retried automatically.
 
 
+
+## Saved character references (unreleased)
+
+Queue submission/subscription supports explicit, version-bound character selections. See the [character guide](https://modelrunner.ai/docs/guides/characters). The client checks enabled contract v1 before uploads, keeps bindings out of model input, and attempts each referenced submission POST once (including transport errors and HTTP redirects). Read-only polling retains its retries. After an uncertain outcome, inspect request history before submitting again. This option is not present in older published releases.
