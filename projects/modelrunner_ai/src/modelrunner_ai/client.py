@@ -48,7 +48,7 @@ Priority = Literal["normal", "low"]
 RUN_URL_FORMAT = f"https://{MODELRUNNER_RUN_HOST}/"
 QUEUE_URL_FORMAT = f"https://queue.{MODELRUNNER_RUN_HOST}/"
 REST_URL = "https://modelrunner.run"
-USER_AGENT = "modelrunner-ai/0.7.0 (python)"
+USER_AGENT = "modelrunner-ai/0.7.1 (python)"
 WEBHOOK_SECRET_URL = f"{REST_URL}/webhooks/default/secret"
 
 
@@ -314,7 +314,20 @@ MAX_DELAY = 30
 RETRY_CODES = [408, 409, 429]
 
 
-def _should_retry(exc: httpx.HTTPError) -> bool:
+def _should_retry(
+    exc: httpx.HTTPError | ModelrunnerClientHTTPError,
+    *,
+    method: str | None = None,
+) -> bool:
+    if isinstance(exc, ModelrunnerClientHTTPError):
+        # _request wraps HTTP status failures before they reach this helper.
+        # Activate those retries only for reads; do not expand POST replay.
+        return (
+            method is not None
+            and method.upper() == "GET"
+            and exc.status_code in RETRY_CODES
+        )
+
     if isinstance(exc, httpx.TransportError):
         return True
 
@@ -351,8 +364,8 @@ def _maybe_retry_request(
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             return _request(client, method, url, **kwargs)
-        except httpx.HTTPError as exc:
-            if _should_retry(exc) and attempt < MAX_ATTEMPTS:
+        except (httpx.HTTPError, ModelrunnerClientHTTPError) as exc:
+            if _should_retry(exc, method=method) and attempt < MAX_ATTEMPTS:
                 delay = _get_retry_delay(
                     attempt, BASE_DELAY, MAX_DELAY, "exponential", True
                 )
@@ -370,8 +383,8 @@ async def _async_maybe_retry_request(
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             return await _async_request(client, method, url, **kwargs)
-        except httpx.HTTPError as exc:
-            if _should_retry(exc) and attempt < MAX_ATTEMPTS:
+        except (httpx.HTTPError, ModelrunnerClientHTTPError) as exc:
+            if _should_retry(exc, method=method) and attempt < MAX_ATTEMPTS:
                 delay = _get_retry_delay(attempt, 0.1, 10, "exponential", True)
                 logger.debug(
                     f"Retrying request to {url} due to {exc} ({MAX_ATTEMPTS - attempt} attempts left)"
