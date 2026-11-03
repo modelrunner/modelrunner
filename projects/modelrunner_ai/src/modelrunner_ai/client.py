@@ -12,6 +12,7 @@ import logging
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import (
+    cast,
     Any,
     AsyncIterator,
     Dict,
@@ -31,6 +32,10 @@ from modelrunner_ai.character_references import (
 from modelrunner_ai.entity_references import (
     EntityReferenceBinding, copy_selected_references, reference_model_path,
     require_entity_reference_support, require_entity_owner_support,
+)
+from modelrunner_ai.entities import (
+    Entity, EntityKind, CreateEntityInput, UpdateEntityInput, EntityList,
+    EntityCapabilities, EntityHandleAvailability, entity_path, handle_input,
 )
 from modelrunner_ai.metadata import metadata_body_keys
 from modelrunner_ai.storage import (
@@ -785,6 +790,57 @@ class AsyncClient:
 
         return await handle.get()
 
+    async def list_entities(
+        self, *, q: str | None = None, type: EntityKind | None = None,
+        page: int = 1, limit: int = 24,
+    ) -> EntityList:
+        """List this owner's entities, counts and admission capabilities."""
+        params: dict[str, Any] = {"page": page, "limit": limit}
+        if q is not None:
+            params["q"] = q
+        if type is not None:
+            params["type"] = type
+        response = await _async_maybe_retry_request(self._client, "GET", f"{REST_URL}/entities",
+            params=params, follow_redirects=False)
+        return cast(EntityList, response.json())
+
+    async def get_entity(self, entity_id: str) -> Entity:
+        response = await _async_maybe_retry_request(self._client, "GET",
+            f"{REST_URL}/entities{entity_path(entity_id)}", follow_redirects=False)
+        return cast(Entity, response.json())
+
+    async def create_entity(self, input: CreateEntityInput) -> Entity:
+        """Create from owned ready File IDs. Never automatically retry a write."""
+        payload = {**input, "fileIds": list(input["fileIds"])}
+        response = await _async_request(self._client, "POST", f"{REST_URL}/entities",
+            json=payload, follow_redirects=False)
+        return cast(Entity, response.json())
+
+    async def update_entity(self, entity_id: str, input: UpdateEntityInput) -> Entity:
+        """Patch against input.version. Omitted fields are preserved."""
+        payload = {**input}
+        if "fileIds" in input:
+            payload["fileIds"] = list(input["fileIds"])
+        response = await _async_request(self._client, "PATCH",
+            f"{REST_URL}/entities{entity_path(entity_id)}", json=payload, follow_redirects=False)
+        return cast(Entity, response.json())
+
+    async def delete_entity(self, entity_id: str) -> None:
+        """Delete the library entity; keep its underlying Files and history."""
+        await _async_request(self._client, "DELETE",
+            f"{REST_URL}/entities{entity_path(entity_id)}", follow_redirects=False)
+
+    async def check_entity_handle(self, *, handle: str | None = None,
+        name: str | None = None) -> EntityHandleAvailability:
+        response = await _async_request(self._client, "POST", f"{REST_URL}/entities/check-handle",
+            json=handle_input(handle, name), follow_redirects=False)
+        return cast(EntityHandleAvailability, response.json())
+
+    async def get_entity_capabilities(self) -> EntityCapabilities:
+        response = await _async_maybe_retry_request(self._client, "GET", f"{REST_URL}/entities/capabilities",
+            follow_redirects=False)
+        return cast(EntityCapabilities, response.json())
+
     async def get_webhook_secret(self) -> str:
         """Return the account's webhook signing secret, creating it on first call.
 
@@ -1428,6 +1484,57 @@ class SyncClient:
                 on_queue_update(event)
 
         return handle.get()
+
+    def list_entities(
+        self, *, q: str | None = None, type: EntityKind | None = None,
+        page: int = 1, limit: int = 24,
+    ) -> EntityList:
+        """List this owner's entities, counts and admission capabilities."""
+        params: dict[str, Any] = {"page": page, "limit": limit}
+        if q is not None:
+            params["q"] = q
+        if type is not None:
+            params["type"] = type
+        response = _maybe_retry_request(self._client, "GET", f"{REST_URL}/entities",
+            params=params, follow_redirects=False)
+        return cast(EntityList, response.json())
+
+    def get_entity(self, entity_id: str) -> Entity:
+        response = _maybe_retry_request(self._client, "GET",
+            f"{REST_URL}/entities{entity_path(entity_id)}", follow_redirects=False)
+        return cast(Entity, response.json())
+
+    def create_entity(self, input: CreateEntityInput) -> Entity:
+        """Create from owned ready File IDs. Never automatically retry a write."""
+        payload = {**input, "fileIds": list(input["fileIds"])}
+        response = _request(self._client, "POST", f"{REST_URL}/entities",
+            json=payload, follow_redirects=False)
+        return cast(Entity, response.json())
+
+    def update_entity(self, entity_id: str, input: UpdateEntityInput) -> Entity:
+        """Patch against input.version. Omitted fields are preserved."""
+        payload = {**input}
+        if "fileIds" in input:
+            payload["fileIds"] = list(input["fileIds"])
+        response = _request(self._client, "PATCH",
+            f"{REST_URL}/entities{entity_path(entity_id)}", json=payload, follow_redirects=False)
+        return cast(Entity, response.json())
+
+    def delete_entity(self, entity_id: str) -> None:
+        """Delete the library entity; keep its underlying Files and history."""
+        _request(self._client, "DELETE",
+            f"{REST_URL}/entities{entity_path(entity_id)}", follow_redirects=False)
+
+    def check_entity_handle(self, *, handle: str | None = None,
+        name: str | None = None) -> EntityHandleAvailability:
+        response = _request(self._client, "POST", f"{REST_URL}/entities/check-handle",
+            json=handle_input(handle, name), follow_redirects=False)
+        return cast(EntityHandleAvailability, response.json())
+
+    def get_entity_capabilities(self) -> EntityCapabilities:
+        response = _maybe_retry_request(self._client, "GET", f"{REST_URL}/entities/capabilities",
+            follow_redirects=False)
+        return cast(EntityCapabilities, response.json())
 
     def get_webhook_secret(self) -> str:
         """Return the account's webhook signing secret, creating it on first call.

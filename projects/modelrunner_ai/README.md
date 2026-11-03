@@ -223,3 +223,29 @@ keep the character-v1 handshake and work with compatible older servers. New
 kinds require generic model capabilities and authenticated owner eligibility;
 older or disabled servers are refused before uploads. Do not put the reserved
 binding key inside model arguments, or send selections through `run`/`stream`.
+
+### Manage the saved library
+
+```python
+items = modelrunner_ai.list_entities(type="prop")
+availability = modelrunner_ai.check_entity_handle(name="Brass lantern")
+entity = modelrunner_ai.create_entity({
+    "type": "prop", "name": "Brass lantern", "handle": availability["handle"],
+    "fileIds": [owned_file_id], "description": "Brass body and a red leather strap",
+})
+updated = modelrunner_ai.update_entity(entity["id"], {
+    "version": entity["version"], "description": "Brass body and a blue leather strap",
+})
+# modelrunner_ai.get_entity(entity["id"])
+# modelrunner_ai.delete_entity(entity["id"])
+```
+
+Library helpers use owned ready File IDs. The API remains responsible for readiness,
+ownership, kind admission and version checks. Writes are single attempts and refuse
+redirects; after an uncertain create, reconcile owner reads before creating again.
+Deleting an Entity keeps its Files and historical Requests. Missing update fields
+are preserved; a conflicting version returns 409. Check availability before create,
+while still handling a concurrent conflict. Availability does not reserve a handle.
+
+The same methods exist on `SyncClient` and `AsyncClient`; module-level async helpers
+use the `_async` suffix. `get_entity_capabilities()` returns account admission.
