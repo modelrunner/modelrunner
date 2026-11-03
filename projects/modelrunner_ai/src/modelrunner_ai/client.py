@@ -26,8 +26,11 @@ import httpx
 from httpx_sse import aconnect_sse, connect_sse
 from modelrunner_ai.auth import MODELRUNNER_RUN_HOST, fetch_credentials
 from modelrunner_ai.character_references import (
-    CharacterReferenceBinding, copy_character_references, character_model_path,
-    reject_raw_character_references, require_character_reference_support,
+    CharacterReferenceBinding, reject_raw_character_references,
+)
+from modelrunner_ai.entity_references import (
+    EntityReferenceBinding, copy_selected_references, reference_model_path,
+    require_entity_reference_support, require_entity_owner_support,
 )
 from modelrunner_ai.metadata import metadata_body_keys
 from modelrunner_ai.storage import (
@@ -48,7 +51,7 @@ Priority = Literal["normal", "low"]
 RUN_URL_FORMAT = f"https://{MODELRUNNER_RUN_HOST}/"
 QUEUE_URL_FORMAT = f"https://queue.{MODELRUNNER_RUN_HOST}/"
 REST_URL = "https://modelrunner.run"
-USER_AGENT = "modelrunner-ai/0.7.1 (python)"
+USER_AGENT = "modelrunner-ai/0.8.0 (python)"
 WEBHOOK_SECRET_URL = f"{REST_URL}/webhooks/default/secret"
 
 
@@ -640,6 +643,7 @@ class AsyncClient:
         priority: Optional[Priority] = None,
         metadata: Mapping[str, str] | None = None,
         character_references: Sequence[CharacterReferenceBinding] | None = None,
+        entity_references: Sequence[EntityReferenceBinding] | None = None,
         lifecycle: StorageSettings | None = None,
         store_io: bool | None = None,
         headers: Mapping[str, str] | None = None,
@@ -659,7 +663,8 @@ class AsyncClient:
         account-wide default -- though neither can widen a limit the account
         already enforces.
 
-        character_references selects frozen character versions. The client
+        entity_references selects frozen Entity versions. character_references remains
+        a character-only compatibility option; use only one option. The client
         checks server capability before uploads and never retries this paid
         submission automatically. After an uncertain outcome, check history
         before submitting again. Plain @words remain literal.
@@ -669,12 +674,15 @@ class AsyncClient:
         passed this way.
         """
 
-        bindings = copy_character_references(character_references)
+        bindings = copy_selected_references(character_references, entity_references)
         reject_raw_character_references(arguments)
         if bindings is not None:
-            model_path = character_model_path(application, path)
+            model_path = reference_model_path(application, path)
             capability_response = await _async_maybe_retry_request(self._client, "GET", f"{REST_URL}/models/{model_path}")
-            require_character_reference_support(capability_response.json())
+            require_entity_reference_support(capability_response.json(), bindings)
+            if any(binding["type"] != "character" for binding in bindings):
+                owner_response = await _async_maybe_retry_request(self._client, "GET", f"{REST_URL}/entities/capabilities")
+                require_entity_owner_support(owner_response.json())
 
         url = QUEUE_URL_FORMAT + application
         if path:
@@ -700,7 +708,7 @@ class AsyncClient:
 
         if bindings is not None:
             arguments = {**arguments, "modelrunner_references": bindings}
-        # A paid POST with character bindings is attempted exactly once, even
+        # A paid POST with explicit bindings is attempted exactly once, even
         # after a transport failure. Read-only polling keeps its retry policy.
         response = await (_async_request if bindings is not None else _async_maybe_retry_request)(
             self._client,
@@ -740,6 +748,7 @@ class AsyncClient:
         webhook_events: Sequence[str] | None = None,
         metadata: Mapping[str, str] | None = None,
         character_references: Sequence[CharacterReferenceBinding] | None = None,
+        entity_references: Sequence[EntityReferenceBinding] | None = None,
         lifecycle: StorageSettings | None = None,
         store_io: bool | None = None,
         headers: Mapping[str, str] | None = None,
@@ -761,6 +770,7 @@ class AsyncClient:
             webhook_events=webhook_events,
             metadata=metadata,
             character_references=character_references,
+            entity_references=entity_references,
             lifecycle=lifecycle,
             store_io=store_io,
             headers=headers,
@@ -1280,6 +1290,7 @@ class SyncClient:
         priority: Optional[Priority] = None,
         metadata: Mapping[str, str] | None = None,
         character_references: Sequence[CharacterReferenceBinding] | None = None,
+        entity_references: Sequence[EntityReferenceBinding] | None = None,
         lifecycle: StorageSettings | None = None,
         store_io: bool | None = None,
         headers: Mapping[str, str] | None = None,
@@ -1299,7 +1310,8 @@ class SyncClient:
         account-wide default -- though neither can widen a limit the account
         already enforces.
 
-        character_references selects frozen character versions. The client
+        entity_references selects frozen Entity versions. character_references remains
+        a character-only compatibility option; use only one option. The client
         checks server capability before uploads and never retries this paid
         submission automatically. After an uncertain outcome, check history
         before submitting again. Plain @words remain literal.
@@ -1309,12 +1321,15 @@ class SyncClient:
         passed this way.
         """
 
-        bindings = copy_character_references(character_references)
+        bindings = copy_selected_references(character_references, entity_references)
         reject_raw_character_references(arguments)
         if bindings is not None:
-            model_path = character_model_path(application, path)
+            model_path = reference_model_path(application, path)
             capability_response = _maybe_retry_request(self._client, "GET", f"{REST_URL}/models/{model_path}")
-            require_character_reference_support(capability_response.json())
+            require_entity_reference_support(capability_response.json(), bindings)
+            if any(binding["type"] != "character" for binding in bindings):
+                owner_response = _maybe_retry_request(self._client, "GET", f"{REST_URL}/entities/capabilities")
+                require_entity_owner_support(owner_response.json())
 
         url = QUEUE_URL_FORMAT + application
         if path:
@@ -1340,7 +1355,7 @@ class SyncClient:
 
         if bindings is not None:
             arguments = {**arguments, "modelrunner_references": bindings}
-        # A paid POST with character bindings is attempted exactly once, even
+        # A paid POST with explicit bindings is attempted exactly once, even
         # after a transport failure. Read-only polling keeps its retry policy.
         response = (_request if bindings is not None else _maybe_retry_request)(
             self._client,
@@ -1377,6 +1392,7 @@ class SyncClient:
         webhook_events: Sequence[str] | None = None,
         metadata: Mapping[str, str] | None = None,
         character_references: Sequence[CharacterReferenceBinding] | None = None,
+        entity_references: Sequence[EntityReferenceBinding] | None = None,
         lifecycle: StorageSettings | None = None,
         store_io: bool | None = None,
         headers: Mapping[str, str] | None = None,
@@ -1398,6 +1414,7 @@ class SyncClient:
             webhook_events=webhook_events,
             metadata=metadata,
             character_references=character_references,
+            entity_references=entity_references,
             lifecycle=lifecycle,
             store_io=store_io,
             headers=headers,

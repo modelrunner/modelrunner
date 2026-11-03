@@ -190,6 +190,36 @@ Both the old and the new secret are signed with for **24 hours** afterwards, so 
 
 
 
-## Saved character references (unreleased)
+## Saved entity references
 
-Queue submission/subscription supports explicit, version-bound character selections. See the [character guide](https://modelrunner.ai/docs/guides/characters). The client checks enabled contract v1 before uploads, keeps bindings out of model input, and attempts each referenced submission POST once (including transport errors and HTTP redirects). Read-only polling retains its retries. After an uncertain outcome, inspect request history before submitting again. This option is not present in older published releases.
+Use `entity_references` with sync/async `submit` or `subscribe` to select saved
+characters, props, environments, styles or scenes. Model and account
+availability is staged; see the [entity guide](https://modelrunner.ai/docs/guides/entities).
+
+```python
+request = modelrunner_ai.submit(
+    "your-team/image-editor",
+    arguments={"prompt": "@lantern on a wooden table"},
+    entity_references=[{
+        "type": "prop",
+        "id": "11111111-1111-4111-8111-111111111111",
+        "mention": "lantern",
+        "version": 1,
+        "file_ids": ["22222222-2222-4222-8222-222222222222"],
+    }],
+)
+```
+
+Replace the endpoint and IDs with your supported model and owned Entity/File
+IDs. Plain `@words` remain literal. The client validates and copies selections,
+checks model-supported kinds and account eligibility **before uploading inputs**,
+and attempts each referenced POST once, including after transport failures and
+HTTP redirects. Read-only polling keeps its retries. After an uncertain result,
+inspect history before submitting again.
+
+`character_references` remains a character-only compatibility option. Use one
+reference option per call; passing both is an error. Character-only selections
+keep the character-v1 handshake and work with compatible older servers. New
+kinds require generic model capabilities and authenticated owner eligibility;
+older or disabled servers are refused before uploads. Do not put the reserved
+binding key inside model arguments, or send selections through `run`/`stream`.
