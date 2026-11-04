@@ -96,8 +96,13 @@ def _copy_reference_bindings(
 
 
 def reference_model_path(application: str, path: str) -> str:
-    if path or not re.fullmatch(
-        r"[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*", application
+    if (
+        not isinstance(application, str)
+        or path
+        or any(part in {".", ".."} for part in application.split("/"))
+        or not re.fullmatch(
+            r"[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*", application
+        )
     ):
         raise ValueError(
             "Entity references require a direct model endpoint with no extra path"
