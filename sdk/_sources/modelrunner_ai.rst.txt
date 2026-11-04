@@ -28,6 +28,22 @@ modelrunner\_ai.client module
    :show-inheritance:
    :undoc-members:
 
+modelrunner\_ai.entities module
+-------------------------------
+
+.. automodule:: modelrunner_ai.entities
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modelrunner\_ai.entity\_references module
+-----------------------------------------
+
+.. automodule:: modelrunner_ai.entity_references
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 modelrunner\_ai.metadata module
 -------------------------------
 
