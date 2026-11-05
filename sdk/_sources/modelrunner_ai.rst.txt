@@ -4,6 +4,14 @@ modelrunner\_ai package
 Submodules
 ----------
 
+modelrunner\_ai.asset\_collections module
+-----------------------------------------
+
+.. automodule:: modelrunner_ai.asset_collections
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 modelrunner\_ai.auth module
 ---------------------------
 
