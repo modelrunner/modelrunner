@@ -249,3 +249,35 @@ while still handling a concurrent conflict. Availability does not reserve a hand
 
 The same methods exist on `SyncClient` and `AsyncClient`; module-level async helpers
 use the `_async` suffix. `get_entity_capabilities()` returns account admission.
+
+
+### Private asset organization (0.9.0+)
+
+```python
+import uuid
+collection = modelrunner_ai.create_asset_collection({
+    "operationId": str(uuid.uuid4()),  # Retain to reconcile this create.
+    "kind": "manual", "name": "Campaign references",
+})
+modelrunner_ai.add_asset_collection_files(collection["id"], [owned_file_id])
+media = modelrunner_ai.list_asset_collection_files(collection["id"])
+modelrunner_ai.favorite_entity(entity["id"])
+modelrunner_ai.assign_entity_tag(entity["id"], {"name": "Campaign"})
+modelrunner_ai.link_entity_assets(entity["id"], [owned_file_id])
+gallery = modelrunner_ai.list_entity_assets(entity["id"])
+```
+
+The same methods exist on SyncClient/AsyncClient and as module-level `_async`
+helpers. Collections are private, separate from catalog collections. Updates and
+deletes require the current version. Membership is idempotent; smart collections
+use bounded All/Any rules instead. Missing targets invalidate smart results.
+Deleting organization keeps Files and promotes children. Writes are single
+attempts with redirects refused. Keep the create operationId to reconcile an
+uncertain result. Unlinking gallery media preserves generated usage and defining
+references. Entity favorites/tags do not change reference versions.
+
+Non-character handles can change under the expected-version check. Character
+handles and entity kinds stay fixed. Optional displayCoverFileId selects a
+separate character presentation image; it never becomes an inference reference.
+Legacy coverFileId stays a defining member File. Responses may include
+optional displayCover, isFavorited and tags; older clients keep working.

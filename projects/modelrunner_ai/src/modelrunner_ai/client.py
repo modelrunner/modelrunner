@@ -37,6 +37,11 @@ from modelrunner_ai.entities import (
     Entity, EntityKind, CreateEntityInput, UpdateEntityInput, EntityList,
     EntityCapabilities, EntityHandleAvailability, entity_path, handle_input,
 )
+from modelrunner_ai.asset_collections import (
+    AssetCollection, AssetCollectionList, CreateAssetCollectionInput, UpdateAssetCollectionInput,
+    AssetRuleGroup, AssetRulePreview, AssetGallery, AssetFileList, ListAssetFilesOptions,
+    AssetTag, AssetTagInput, collection_path,
+)
 from modelrunner_ai.metadata import metadata_body_keys
 from modelrunner_ai.storage import (
     StorageSettings,
@@ -792,7 +797,7 @@ class AsyncClient:
 
     async def list_entities(
         self, *, q: str | None = None, type: EntityKind | None = None,
-        page: int = 1, limit: int = 24,
+        page: int = 1, limit: int = 24, favorites_only: bool | None = None, tag_id: str | None = None,
     ) -> EntityList:
         """List this owner's entities, counts and admission capabilities."""
         params: dict[str, Any] = {"page": page, "limit": limit}
@@ -800,6 +805,10 @@ class AsyncClient:
             params["q"] = q
         if type is not None:
             params["type"] = type
+        if favorites_only is not None:
+            params["favoritesOnly"] = str(favorites_only).lower()
+        if tag_id is not None:
+            params["tagId"] = tag_id
         response = await _async_maybe_retry_request(self._client, "GET", f"{REST_URL}/entities",
             params=params, follow_redirects=False)
         return cast(EntityList, response.json())
@@ -840,6 +849,118 @@ class AsyncClient:
         response = await _async_maybe_retry_request(self._client, "GET", f"{REST_URL}/entities/capabilities",
             follow_redirects=False)
         return cast(EntityCapabilities, response.json())
+
+    async def list_asset_collections(self) -> AssetCollectionList:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "GET",
+            REST_URL + "/asset-collections", follow_redirects=False)
+        return cast(AssetCollectionList, response.json())
+
+    async def get_asset_collection(self, collection_id: str) -> AssetCollection:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "GET",
+            REST_URL + collection_path(collection_id), follow_redirects=False)
+        return cast(AssetCollection, response.json())
+
+    async def create_asset_collection(self, input: CreateAssetCollectionInput) -> AssetCollection:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "POST",
+            REST_URL + "/asset-collections", json=dict(input), follow_redirects=False)
+        return cast(AssetCollection, response.json())
+
+    async def update_asset_collection(self, collection_id: str, input: UpdateAssetCollectionInput) -> AssetCollection:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "PATCH",
+            REST_URL + collection_path(collection_id), json=dict(input), follow_redirects=False)
+        return cast(AssetCollection, response.json())
+
+    async def delete_asset_collection(self, collection_id: str, version: int) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "DELETE",
+            REST_URL + collection_path(collection_id), json={"version": version}, follow_redirects=False)
+        response.raise_for_status()
+
+    async def add_asset_collection_files(self, collection_id: str, file_ids: Sequence[str]) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "PUT",
+            REST_URL + collection_path(collection_id) + "/files", json={"fileIds": list(file_ids)}, follow_redirects=False)
+        response.raise_for_status()
+
+    async def remove_asset_collection_files(self, collection_id: str, file_ids: Sequence[str]) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "DELETE",
+            REST_URL + collection_path(collection_id) + "/files", json={"fileIds": list(file_ids)}, follow_redirects=False)
+        response.raise_for_status()
+
+    async def list_asset_collection_files(self, collection_id: str, query: ListAssetFilesOptions | None = None) -> AssetFileList:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        params = dict(query or {})
+        params["collectionId"] = collection_id
+        collection_path(collection_id)  # Validate before any network call.
+        response = await _async_request(self._client, "GET",
+            REST_URL + "/files", params=params, follow_redirects=False)
+        return cast(AssetFileList, response.json())
+
+    async def preview_asset_collection(self, rules: AssetRuleGroup) -> AssetRulePreview:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "POST",
+            REST_URL + "/asset-collections/preview", json=dict(rules), follow_redirects=False)
+        return cast(AssetRulePreview, response.json())
+
+    async def favorite_asset_collection(self, collection_id: str, favorite: bool = True) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, ("PUT" if favorite else "DELETE"),
+            REST_URL + collection_path(collection_id) + "/favorite", follow_redirects=False)
+        response.raise_for_status()
+
+    async def assign_asset_collection_tag(self, collection_id: str, tag: AssetTagInput) -> AssetTag:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "POST",
+            REST_URL + collection_path(collection_id) + "/tags", json=dict(tag), follow_redirects=False)
+        return cast(AssetTag, response.json())
+
+    async def remove_asset_collection_tag(self, collection_id: str, tag_id: str) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "DELETE",
+            REST_URL + collection_path(collection_id) + "/tags" + entity_path(tag_id), follow_redirects=False)
+        response.raise_for_status()
+
+    async def list_entity_assets(self, entity_id: str, query: ListAssetFilesOptions | None = None) -> AssetGallery:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        params = dict(query or {})
+        response = await _async_request(self._client, "GET",
+            REST_URL + "/entities" + entity_path(entity_id) + "/assets", params=params, follow_redirects=False)
+        return cast(AssetGallery, response.json())
+
+    async def link_entity_assets(self, entity_id: str, file_ids: Sequence[str]) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "PUT",
+            REST_URL + "/entities" + entity_path(entity_id) + "/assets", json={"fileIds": list(file_ids)}, follow_redirects=False)
+        response.raise_for_status()
+
+    async def unlink_entity_assets(self, entity_id: str, file_ids: Sequence[str]) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "DELETE",
+            REST_URL + "/entities" + entity_path(entity_id) + "/assets", json={"fileIds": list(file_ids)}, follow_redirects=False)
+        response.raise_for_status()
+
+    async def favorite_entity(self, entity_id: str, favorite: bool = True) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, ("PUT" if favorite else "DELETE"),
+            REST_URL + "/entities" + entity_path(entity_id) + "/favorite", follow_redirects=False)
+        response.raise_for_status()
+
+    async def assign_entity_tag(self, entity_id: str, tag: AssetTagInput) -> AssetTag:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "POST",
+            REST_URL + "/entities" + entity_path(entity_id) + "/tags", json=dict(tag), follow_redirects=False)
+        return cast(AssetTag, response.json())
+
+    async def remove_entity_tag(self, entity_id: str, tag_id: str) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = await _async_request(self._client, "DELETE",
+            REST_URL + "/entities" + entity_path(entity_id) + "/tags" + entity_path(tag_id), follow_redirects=False)
+        response.raise_for_status()
 
     async def get_webhook_secret(self) -> str:
         """Return the account's webhook signing secret, creating it on first call.
@@ -1487,7 +1608,7 @@ class SyncClient:
 
     def list_entities(
         self, *, q: str | None = None, type: EntityKind | None = None,
-        page: int = 1, limit: int = 24,
+        page: int = 1, limit: int = 24, favorites_only: bool | None = None, tag_id: str | None = None,
     ) -> EntityList:
         """List this owner's entities, counts and admission capabilities."""
         params: dict[str, Any] = {"page": page, "limit": limit}
@@ -1495,6 +1616,10 @@ class SyncClient:
             params["q"] = q
         if type is not None:
             params["type"] = type
+        if favorites_only is not None:
+            params["favoritesOnly"] = str(favorites_only).lower()
+        if tag_id is not None:
+            params["tagId"] = tag_id
         response = _maybe_retry_request(self._client, "GET", f"{REST_URL}/entities",
             params=params, follow_redirects=False)
         return cast(EntityList, response.json())
@@ -1535,6 +1660,118 @@ class SyncClient:
         response = _maybe_retry_request(self._client, "GET", f"{REST_URL}/entities/capabilities",
             follow_redirects=False)
         return cast(EntityCapabilities, response.json())
+
+    def list_asset_collections(self) -> AssetCollectionList:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "GET",
+            REST_URL + "/asset-collections", follow_redirects=False)
+        return cast(AssetCollectionList, response.json())
+
+    def get_asset_collection(self, collection_id: str) -> AssetCollection:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "GET",
+            REST_URL + collection_path(collection_id), follow_redirects=False)
+        return cast(AssetCollection, response.json())
+
+    def create_asset_collection(self, input: CreateAssetCollectionInput) -> AssetCollection:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "POST",
+            REST_URL + "/asset-collections", json=dict(input), follow_redirects=False)
+        return cast(AssetCollection, response.json())
+
+    def update_asset_collection(self, collection_id: str, input: UpdateAssetCollectionInput) -> AssetCollection:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "PATCH",
+            REST_URL + collection_path(collection_id), json=dict(input), follow_redirects=False)
+        return cast(AssetCollection, response.json())
+
+    def delete_asset_collection(self, collection_id: str, version: int) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "DELETE",
+            REST_URL + collection_path(collection_id), json={"version": version}, follow_redirects=False)
+        response.raise_for_status()
+
+    def add_asset_collection_files(self, collection_id: str, file_ids: Sequence[str]) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "PUT",
+            REST_URL + collection_path(collection_id) + "/files", json={"fileIds": list(file_ids)}, follow_redirects=False)
+        response.raise_for_status()
+
+    def remove_asset_collection_files(self, collection_id: str, file_ids: Sequence[str]) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "DELETE",
+            REST_URL + collection_path(collection_id) + "/files", json={"fileIds": list(file_ids)}, follow_redirects=False)
+        response.raise_for_status()
+
+    def list_asset_collection_files(self, collection_id: str, query: ListAssetFilesOptions | None = None) -> AssetFileList:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        params = dict(query or {})
+        params["collectionId"] = collection_id
+        collection_path(collection_id)  # Validate before any network call.
+        response = _request(self._client, "GET",
+            REST_URL + "/files", params=params, follow_redirects=False)
+        return cast(AssetFileList, response.json())
+
+    def preview_asset_collection(self, rules: AssetRuleGroup) -> AssetRulePreview:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "POST",
+            REST_URL + "/asset-collections/preview", json=dict(rules), follow_redirects=False)
+        return cast(AssetRulePreview, response.json())
+
+    def favorite_asset_collection(self, collection_id: str, favorite: bool = True) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, ("PUT" if favorite else "DELETE"),
+            REST_URL + collection_path(collection_id) + "/favorite", follow_redirects=False)
+        response.raise_for_status()
+
+    def assign_asset_collection_tag(self, collection_id: str, tag: AssetTagInput) -> AssetTag:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "POST",
+            REST_URL + collection_path(collection_id) + "/tags", json=dict(tag), follow_redirects=False)
+        return cast(AssetTag, response.json())
+
+    def remove_asset_collection_tag(self, collection_id: str, tag_id: str) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "DELETE",
+            REST_URL + collection_path(collection_id) + "/tags" + entity_path(tag_id), follow_redirects=False)
+        response.raise_for_status()
+
+    def list_entity_assets(self, entity_id: str, query: ListAssetFilesOptions | None = None) -> AssetGallery:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        params = dict(query or {})
+        response = _request(self._client, "GET",
+            REST_URL + "/entities" + entity_path(entity_id) + "/assets", params=params, follow_redirects=False)
+        return cast(AssetGallery, response.json())
+
+    def link_entity_assets(self, entity_id: str, file_ids: Sequence[str]) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "PUT",
+            REST_URL + "/entities" + entity_path(entity_id) + "/assets", json={"fileIds": list(file_ids)}, follow_redirects=False)
+        response.raise_for_status()
+
+    def unlink_entity_assets(self, entity_id: str, file_ids: Sequence[str]) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "DELETE",
+            REST_URL + "/entities" + entity_path(entity_id) + "/assets", json={"fileIds": list(file_ids)}, follow_redirects=False)
+        response.raise_for_status()
+
+    def favorite_entity(self, entity_id: str, favorite: bool = True) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, ("PUT" if favorite else "DELETE"),
+            REST_URL + "/entities" + entity_path(entity_id) + "/favorite", follow_redirects=False)
+        response.raise_for_status()
+
+    def assign_entity_tag(self, entity_id: str, tag: AssetTagInput) -> AssetTag:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "POST",
+            REST_URL + "/entities" + entity_path(entity_id) + "/tags", json=dict(tag), follow_redirects=False)
+        return cast(AssetTag, response.json())
+
+    def remove_entity_tag(self, entity_id: str, tag_id: str) -> None:
+        """Owner-only organization. Writes are single attempts with redirects refused."""
+        response = _request(self._client, "DELETE",
+            REST_URL + "/entities" + entity_path(entity_id) + "/tags" + entity_path(tag_id), follow_redirects=False)
+        response.raise_for_status()
 
     def get_webhook_secret(self) -> str:
         """Return the account's webhook signing secret, creating it on first call.
