@@ -13,7 +13,19 @@ class EntityImage(TypedDict):
     position: int
 
 
-class Entity(TypedDict):
+class EntityDisplayCover(TypedDict):
+    fileId: str
+    url: str
+    mimeType: str
+
+
+class _EntityOrganization(TypedDict, total=False):
+    displayCover: EntityDisplayCover | None
+    isFavorited: bool
+    tags: list[dict[str, str]]
+
+
+class Entity(_EntityOrganization):
     id: str
     type: EntityKind
     name: str
@@ -37,6 +49,7 @@ class CreateEntityInput(_CreateRequired, total=False):
     # Characters require a nonempty description; the API validates stored-kind rules.
     description: str | None
     coverFileId: str
+    displayCoverFileId: str | None
 
 
 class _UpdateRequired(TypedDict):
@@ -44,6 +57,9 @@ class _UpdateRequired(TypedDict):
 
 
 class UpdateEntityInput(_UpdateRequired, total=False):
+    # Only non-character handles are editable.
+    handle: str
+    displayCoverFileId: str | None
     name: str
     description: str | None
     fileIds: list[str]

@@ -1,3 +1,8 @@
+from modelrunner_ai.asset_collections import (
+    AssetCollection, AssetCollectionList, CreateAssetCollectionInput, UpdateAssetCollectionInput,
+    AssetRuleCondition, AssetRuleGroup, AssetRulePreview, AssetFile, AssetFileList,
+    AssetGalleryItem, AssetGallery, ListAssetFilesOptions, AssetTag, AssetTagInput,
+)
 from modelrunner_ai.entities import (
     Entity, EntityImage, CreateEntityInput, UpdateEntityInput, EntityList,
     EntityCapabilities, EntityHandleAvailability,
@@ -34,6 +39,57 @@ from modelrunner_ai.webhooks import (
 )
 
 __all__ = [
+    "AssetCollection",
+    "AssetCollectionList",
+    "CreateAssetCollectionInput",
+    "UpdateAssetCollectionInput",
+    "AssetRuleCondition",
+    "AssetRuleGroup",
+    "AssetRulePreview",
+    "AssetFile",
+    "AssetFileList",
+    "AssetGalleryItem",
+    "AssetGallery",
+    "ListAssetFilesOptions",
+    "AssetTag",
+    "AssetTagInput",
+    "list_asset_collections",
+    "list_asset_collections_async",
+    "get_asset_collection",
+    "get_asset_collection_async",
+    "create_asset_collection",
+    "create_asset_collection_async",
+    "update_asset_collection",
+    "update_asset_collection_async",
+    "delete_asset_collection",
+    "delete_asset_collection_async",
+    "add_asset_collection_files",
+    "add_asset_collection_files_async",
+    "remove_asset_collection_files",
+    "remove_asset_collection_files_async",
+    "list_asset_collection_files",
+    "list_asset_collection_files_async",
+    "preview_asset_collection",
+    "preview_asset_collection_async",
+    "favorite_asset_collection",
+    "favorite_asset_collection_async",
+    "assign_asset_collection_tag",
+    "assign_asset_collection_tag_async",
+    "remove_asset_collection_tag",
+    "remove_asset_collection_tag_async",
+    "list_entity_assets",
+    "list_entity_assets_async",
+    "link_entity_assets",
+    "link_entity_assets_async",
+    "unlink_entity_assets",
+    "unlink_entity_assets_async",
+    "favorite_entity",
+    "favorite_entity_async",
+    "assign_entity_tag",
+    "assign_entity_tag_async",
+    "remove_entity_tag",
+    "remove_entity_tag_async",
+
     "Entity",
     "EntityImage",
     "CreateEntityInput",
@@ -141,3 +197,57 @@ check_entity_handle = sync_client.check_entity_handle
 check_entity_handle_async = async_client.check_entity_handle
 get_entity_capabilities = sync_client.get_entity_capabilities
 get_entity_capabilities_async = async_client.get_entity_capabilities
+
+list_asset_collections = sync_client.list_asset_collections
+list_asset_collections_async = async_client.list_asset_collections
+
+get_asset_collection = sync_client.get_asset_collection
+get_asset_collection_async = async_client.get_asset_collection
+
+create_asset_collection = sync_client.create_asset_collection
+create_asset_collection_async = async_client.create_asset_collection
+
+update_asset_collection = sync_client.update_asset_collection
+update_asset_collection_async = async_client.update_asset_collection
+
+delete_asset_collection = sync_client.delete_asset_collection
+delete_asset_collection_async = async_client.delete_asset_collection
+
+add_asset_collection_files = sync_client.add_asset_collection_files
+add_asset_collection_files_async = async_client.add_asset_collection_files
+
+remove_asset_collection_files = sync_client.remove_asset_collection_files
+remove_asset_collection_files_async = async_client.remove_asset_collection_files
+
+list_asset_collection_files = sync_client.list_asset_collection_files
+list_asset_collection_files_async = async_client.list_asset_collection_files
+
+preview_asset_collection = sync_client.preview_asset_collection
+preview_asset_collection_async = async_client.preview_asset_collection
+
+favorite_asset_collection = sync_client.favorite_asset_collection
+favorite_asset_collection_async = async_client.favorite_asset_collection
+
+assign_asset_collection_tag = sync_client.assign_asset_collection_tag
+assign_asset_collection_tag_async = async_client.assign_asset_collection_tag
+
+remove_asset_collection_tag = sync_client.remove_asset_collection_tag
+remove_asset_collection_tag_async = async_client.remove_asset_collection_tag
+
+list_entity_assets = sync_client.list_entity_assets
+list_entity_assets_async = async_client.list_entity_assets
+
+link_entity_assets = sync_client.link_entity_assets
+link_entity_assets_async = async_client.link_entity_assets
+
+unlink_entity_assets = sync_client.unlink_entity_assets
+unlink_entity_assets_async = async_client.unlink_entity_assets
+
+favorite_entity = sync_client.favorite_entity
+favorite_entity_async = async_client.favorite_entity
+
+assign_entity_tag = sync_client.assign_entity_tag
+assign_entity_tag_async = async_client.assign_entity_tag
+
+remove_entity_tag = sync_client.remove_entity_tag
+remove_entity_tag_async = async_client.remove_entity_tag
